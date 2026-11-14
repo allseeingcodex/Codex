@@ -202,6 +202,33 @@
       padding-bottom: 5px !important;
     }
 
+    /* Party Mode */
+    #partyOverlay { position: fixed; inset: 0; z-index: 9999; pointer-events: none; overflow: hidden; transition: opacity .4s ease; }
+    #partyOverlay.party-out { opacity: 0; }
+    #partyOverlay canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #partyText {
+      position: absolute; left: 0; right: 0; top: 50%;
+      transform: translateY(-50%);
+      text-align: center; white-space: nowrap;
+      font-family: 'Inter', system-ui, sans-serif; font-weight: 900; letter-spacing: 0.04em;
+      font-size: clamp(4rem, 22vw, 18rem); line-height: 1;
+      color: #ef4444;
+      -webkit-text-stroke: 0.03em #7f1d1d;
+      text-shadow: 0 0.04em 0 #7f1d1d, 0 0 0.4em rgba(239, 68, 68, 0.55);
+      animation: partyTextPulse 0.9s ease-in-out infinite alternate;
+    }
+    .party-cat {
+      position: absolute; line-height: 1; opacity: 0;
+      animation: partyCatPop 1.5s ease-in-out both, partyCatDance 0.45s ease-in-out infinite alternate;
+    }
+    @keyframes partyTextPulse { from { transform: translateY(-50%) scale(0.96) rotate(-2deg); } to { transform: translateY(-50%) scale(1.04) rotate(2deg); } }
+    @keyframes partyCatPop { 0% { opacity: 0; scale: 0.2; } 20% { opacity: 1; scale: 1; } 80% { opacity: 1; scale: 1; } 100% { opacity: 0; scale: 0.2; } }
+    @keyframes partyCatDance { from { transform: translateY(0) rotate(-14deg); } to { transform: translateY(-22px) rotate(14deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #partyText { animation: none; }
+      .party-cat { animation: partyCatPop 1.5s ease-in-out both; }
+    }
+
     /* Mana & Rarity Badges */
     .mana-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     .mana-dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
@@ -395,6 +422,10 @@
         <button onclick="toggleColorTheme()" id="btnThemeToggle" class="py-2 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-gold-300 border border-white/15 flex items-center justify-center gap-1.5 transition" title="Toggle Light / Dark Mode">
           <i id="themeToggleIcon" class="fa-solid fa-sun text-xs"></i>
           <span id="themeToggleTextLabel">Light Mode</span>
+        </button>
+        <button onclick="startPartyMode(); closeNavDrawer();" id="btnPartyMode" class="col-span-2 py-2 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-parchment-200 border border-white/15 flex items-center justify-center gap-1.5 transition" title="Party mode!">
+          <i class="fa-solid fa-champagne-glasses text-rose-400 text-xs"></i>
+          <span>Party Mode</span>
         </button>
       </div>
       <!-- Subtle Last Synced Notice at bottom of Hamburger Menu -->
@@ -3879,6 +3910,112 @@
       saveAppState();
       applyActiveProfileToUI();
       refreshAllViews();
+    }
+
+    // ---- Party Mode: confetti, dancing cats and a big red PARTY! for about 4 seconds ----
+    let partyTimers = [];
+    let partyRaf = 0;
+
+    function stopPartyMode() {
+      partyTimers.forEach(clearTimeout);
+      partyTimers = [];
+      if (partyRaf) cancelAnimationFrame(partyRaf);
+      partyRaf = 0;
+      const old = document.getElementById('partyOverlay');
+      if (old) old.remove();
+    }
+
+    function startPartyMode() {
+      stopPartyMode();
+      const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const TOTAL_MS = 4200;
+
+      const overlay = document.createElement('div');
+      overlay.id = 'partyOverlay';
+      overlay.setAttribute('aria-hidden', 'true');
+
+      const canvas = document.createElement('canvas');
+      overlay.appendChild(canvas);
+
+      const text = document.createElement('div');
+      text.id = 'partyText';
+      text.textContent = 'PARTY!';
+      overlay.appendChild(text);
+
+      // Dancing cats pop in and out at random spots (slow pops, no strobing)
+      const catFaces = ['🐱', '😸', '😹', '😻', '😼', '🐈', '🐈‍⬛'];
+      for (let i = 0; i < 14; i++) {
+        const cat = document.createElement('div');
+        cat.className = 'party-cat';
+        cat.textContent = catFaces[i % catFaces.length];
+        const size = 48 + Math.random() * 56;
+        cat.style.fontSize = size + 'px';
+        cat.style.left = (3 + Math.random() * 90) + '%';
+        cat.style.top = (8 + Math.random() * 78) + '%';
+        cat.style.animationDelay = (Math.random() * 2.4).toFixed(2) + 's, ' + (Math.random() * 0.4).toFixed(2) + 's';
+        cat.style.animationDuration = '1.5s, ' + (0.35 + Math.random() * 0.3).toFixed(2) + 's';
+        overlay.appendChild(cat);
+      }
+      document.body.appendChild(overlay);
+
+      // Confetti on a canvas
+      const ctx = canvas.getContext('2d');
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let W = 0, H = 0;
+      const resize = () => {
+        W = window.innerWidth; H = window.innerHeight;
+        canvas.width = W * dpr; canvas.height = H * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+      resize();
+
+      const colors = ['#ef4444', '#f59e0b', '#fde047', '#22c55e', '#38bdf8', '#a855f7', '#ec4899', '#ffffff'];
+      const pieces = [];
+      const addPiece = (x, y, vx, vy) => pieces.push({
+        x, y, vx, vy,
+        w: 6 + Math.random() * 8, h: 4 + Math.random() * 6,
+        rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.4,
+        color: colors[(Math.random() * colors.length) | 0],
+        round: Math.random() < 0.25
+      });
+      // left cannon shoots up-right, right cannon shoots up-left
+      for (let i = 0; i < 90; i++) {
+        const a = (25 + Math.random() * 40) * Math.PI / 180, v = 14 + Math.random() * 14;
+        addPiece(0, H, Math.sin(a) * v, -Math.cos(a) * v);
+        const b = (25 + Math.random() * 40) * Math.PI / 180, w = 14 + Math.random() * 14;
+        addPiece(W, H, -Math.sin(b) * w, -Math.cos(b) * w);
+      }
+
+      let last = performance.now();
+      const startedAt = last;
+      const frame = (now) => {
+        const dt = Math.min((now - last) / 16.67, 3); // 1 = one 60fps frame
+        last = now;
+        const elapsed = now - startedAt;
+        // a light drizzle from the top while the party runs
+        if (elapsed < 3000) {
+          for (let i = 0; i < 3; i++) addPiece(Math.random() * W, -10, (Math.random() - 0.5) * 3, 2 + Math.random() * 3);
+        }
+        ctx.clearRect(0, 0, W, H);
+        for (let i = pieces.length - 1; i >= 0; i--) {
+          const p = pieces[i];
+          p.vy += 0.32 * dt;
+          p.vx *= Math.pow(0.992, dt);
+          p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+          if (p.y > H + 20) { pieces.splice(i, 1); continue; }
+          ctx.save();
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); }
+          else ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        }
+        if (elapsed < TOTAL_MS) partyRaf = requestAnimationFrame(frame);
+      };
+      if (!reduceMotion) partyRaf = requestAnimationFrame(frame);
+
+      partyTimers.push(setTimeout(() => overlay.classList.add('party-out'), TOTAL_MS - 450));
+      partyTimers.push(setTimeout(stopPartyMode, TOTAL_MS + 100));
     }
 
     function toggleColorTheme() {
