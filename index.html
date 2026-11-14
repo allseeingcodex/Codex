@@ -4389,5 +4389,6 @@ var go=function(){setTimeout(function(){loadServer().then(function(ok){if(ok)upd
 if(document.readyState==="complete")go();else window.addEventListener("load",go);
 })();
 </script>
+<script>document.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.shiftKey||e.isComposing)return;var id=e.target&&e.target.id;if(id==="authModalLoginPassword"){e.preventDefault();loginSelectedAccountFromModal();}else if(id==="authSignUpName"||id==="authSignUpEmail"||id==="authSignUpPassword"){e.preventDefault();signUpNewAccountFromModal();}},true);</script>
 </body>
 </html>
