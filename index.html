@@ -4413,5 +4413,14 @@ var oa=window.adminManualAddMissingCard;
 if(typeof oa==="function")window.adminManualAddMissingCard=async function(){var el=document.getElementById("manualMissingName");var raw=el?(el.value||"").trim():"";var fixed=raw;if(raw){try{fixed=await resolveName(raw);}catch(e){}if(el&&fixed&&fixed!==raw)el.value=fixed;}var res=await oa.apply(this,arguments);if(raw&&fixed&&fixed!==raw&&el&&el.value===""){showToast("Name Corrected","Added as "+fixed+" (you typed "+raw+").");}return res;};
 })();
 </script>
+<script>
+(function(){
+var M={manualMissingName:"adminManualAddMissingCard",manualMissingSet:"adminManualAddMissingCard",manualMissingPrice:"adminManualAddMissingCard",manualVaultName:"adminManualAddVaultCard",manualVaultBatch:"adminManualAddVaultCard",manualVaultSeq:"adminManualAddVaultCard",manualVaultSet:"adminManualAddVaultCard",manualVaultNumber:"adminManualAddVaultCard",sheetWebhookUrlInput:"setBaseSheetName",manualSheetNameInput:"setBaseSheetName",newAccountNameInput:"adminRegisterUser",newAccountEmailInput:"adminRegisterUser",newAccountPasswordInput:"adminRegisterUser",authCurrentUsernameInput:"saveCurrentAccountProfile",authCurrentPasswordInput:"saveCurrentAccountProfile",newMenuOptionLabel:"adminAddMenuOption",newMenuOptionUrl:"adminAddMenuOption"};
+function press(start,fn){var p=start,b=null,d;for(d=0;d<6&&p&&!b;d++,p=p.parentElement){b=p.querySelector("button[onclick*="+fn+"]");}if(b&&!b.disabled){b.click();return true;}return false;}
+document.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.isComposing||e.shiftKey)return;var t=e.target;if(!t||!t.id)return;
+if(t.id==="inscribeTextarea"){if(e.metaKey||e.ctrlKey){e.preventDefault();press(t,"lookupAndPreviewMissingCards");}return;}
+var fn=M[t.id];if(!fn)return;e.preventDefault();press(t,fn);},true);
+})();
+</script>
 </body>
 </html>
