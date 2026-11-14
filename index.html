@@ -4474,5 +4474,54 @@ try{window.switchTab&&0;}catch(e){}
 },500);
 })();
 </script>
+<script>
+(function(){
+function sig(c){return normalizeCardName(c.name)+"|"+c.batch+"|"+c.seq;}
+function rec(cat,label,sum,undo){try{recordChangeLog(cat,label,sum,undo);}catch(e){}}
+function names(a){var n=a.map(function(c){return '"'+c.name+'"';});return n.length>3?n.slice(0,3).join(", ")+" and "+(n.length-3)+" more":n.join(", ");}
+function after(r,fn){if(r&&typeof r.then==="function")return r.then(function(x){try{fn();}catch(e){}return x;});try{fn();}catch(e){}return r;}
+function wrapAdd(name){
+var o=window[name];if(typeof o!=="function")return;
+window[name]=function(){
+var m0={},v0={};
+try{missingCards.forEach(function(c){m0[c.id]=1;});vaultCards.forEach(function(c){v0[sig(c)]=1;});}catch(e){}
+var r=o.apply(this,arguments);
+return after(r,function(){
+var nm=missingCards.filter(function(c){return !m0[c.id];});
+var nv=vaultCards.filter(function(c){return !v0[sig(c)];});
+if(nm.length)rec("ADD",nm.length>1?"Added "+nm.length+" Missing Cards":"Added Missing Card","Added "+names(nm)+" to Missing Cards.",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});
+if(nv.length)rec("ADD",nv.length>1?"Added "+nv.length+" Batch Cards":"Added Batch Card","Added "+names(nv)+" to the Batches.",{type:"ADD_VAULT",cards:nv});
+});};}
+["adminManualAddMissingCard","adminManualAddVaultCard","commitInscribedCardsToGrimoire"].forEach(wrapAdd);
+var pend={missing:[],vault:[]},timer=null;
+var mv=window.moveCardToRecentlyDeleted;
+if(typeof mv==="function")window.moveCardToRecentlyDeleted=function(type,card){
+var r=mv.apply(this,arguments);
+try{(type==="missing"?pend.missing:pend.vault).push(JSON.parse(JSON.stringify(card)));}catch(e){}
+if(!timer)timer=setTimeout(function(){
+timer=null;var p=pend;pend={missing:[],vault:[]};
+if(p.missing.length)rec("DELETE",p.missing.length>1?"Deleted "+p.missing.length+" Missing Cards":"Deleted Missing Card","Moved "+names(p.missing)+" from Missing Cards to Recently Deleted.",{type:"DELETE_MISSING",cards:p.missing});
+if(p.vault.length)rec("DELETE",p.vault.length>1?"Deleted "+p.vault.length+" Batch Cards":"Deleted Batch Card","Moved "+names(p.vault)+" from the Batches to Recently Deleted.",{type:"DELETE_VAULT",cards:p.vault});
+},60);
+return r;};
+function wrapTrash(name,kind){
+var o=window[name];if(typeof o!=="function")return;
+window[name]=function(){
+var b=[];try{b=recentlyDeletedCards.slice();}catch(e){}
+var r=o.apply(this,arguments);
+return after(r,function(){
+var left={};recentlyDeletedCards.forEach(function(i){left[i.trashId]=1;});
+var gone=b.filter(function(i){return !left[i.trashId];});
+if(!gone.length)return;
+var cs=gone.map(function(i){return i.card||{name:"?"};});
+if(kind==="restore")rec("RESTORE",gone.length>1?"Restored "+gone.length+" Cards":"Restored Card","Restored "+names(cs)+" from Recently Deleted.",{type:"RESTORE_TRASH",items:gone});
+else rec("DELETE","Permanently Deleted","Permanently deleted "+names(cs)+" from Recently Deleted.",null);
+});};}
+wrapTrash("restoreCardFromRecentlyDeleted","restore");
+wrapTrash("restoreAllRecentlyDeleted","restore");
+wrapTrash("permanentlyDeleteFromTrash","perm");
+wrapTrash("emptyRecentlyDeletedNow","perm");
+})();
+</script>
 </body>
 </html>
