@@ -3675,7 +3675,7 @@
       if (!nav) return;
       const visibleTrashCount = getVisibleRecentlyDeletedItems().length;
       nav.innerHTML = siteCustomizations.navMenu
-        .filter(item => item.visible !== false && (((item.id !== 'admin') && (item.id !== 'users')) || isAdminOrOwner()))
+        .filter(item => item.visible !== false && (((item.id !== 'admin') && (item.id !== 'users') && (item.id !== 'changelog')) || isAdminOrOwner()))
         .map(item => {
           const active = item.id === currentActiveTabId;
           const clickAttr = item.type === 'external'
@@ -4393,7 +4393,7 @@ if(document.readyState==="complete")go();else window.addEventListener("load",go)
 })();
 </script>
 <script>document.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.shiftKey||e.isComposing)return;var id=e.target&&e.target.id;if(id==="authModalLoginPassword"){e.preventDefault();loginSelectedAccountFromModal();}else if(id==="authSignUpName"||id==="authSignUpEmail"||id==="authSignUpPassword"||id==="authSignUpPassword2"){e.preventDefault();signUpNewAccountFromModal();}},true);</script>
-<script>(function(){var s=window.switchTab;if(typeof s!=="function")return;window.switchTab=function(id){if(id==="users"&&!isAdminOrOwner())return;return s.apply(this,arguments);};})();</script>
+<script>(function(){var s=window.switchTab;if(typeof s!=="function")return;window.switchTab=function(id){if((id==="users"||id==="changelog")&&!isAdminOrOwner())return;return s.apply(this,arguments);};})();</script>
 <script>(function(){var ts=window.showToast;function note(id,msg,ok){var e=document.getElementById(id);if(!e)return;e.textContent=(ok?"\u2713 ":"")+msg;e.className="text-xs font-semibold px-2 py-1.5 rounded-lg border "+(ok?"text-emerald-300 bg-emerald-500/10 border-emerald-500/30":"text-rose-300 bg-rose-500/10 border-rose-500/30");clearTimeout(e._t);e._t=setTimeout(function(){e.className="hidden";},6000);}window.showToast=function(title,msg){var r=ts.apply(this,arguments);try{var g=function(x){var el=document.getElementById(x);return el?el.value:"";};if(title==="Profile Saved"){note("profileSaveNote",msg==="Your profile was updated."?"Profile updated!":msg,true);}else if(title==="Could Not Save"){note("profileSaveNote",msg,false);}else if(title==="Password Too Short"){note(g("authCurrentPasswordInput")&&!g("authSignUpPassword")?"profileSaveNote":"signUpNote",msg,false);}else if(title==="Valid Email Required"||title==="Passwords Do Not Match"||title==="Sign Up Failed"){note("signUpNote",msg,false);}}catch(x){}return r;};})();</script>
 </body>
 </html>
