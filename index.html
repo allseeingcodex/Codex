@@ -2770,7 +2770,7 @@
           <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${m.isLocated ? 'located-row-glow' : ''}">
             ${cols.status ? `<td class="py-2 px-4 whitespace-nowrap">${statusHtml}</td>` : ''}
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(m.name)}', '', '${escapeJs(m.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
+              <button onclick="openInspectModal('${escapeJs(m.name)}', '', '${escapeJs(m.set)}', '', '', true)" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(m.name)}
               </button>
             </td>
@@ -2901,7 +2901,7 @@
             ${cols.batch ? `<td class="py-2 px-3 font-mono font-bold text-xs text-gold-300">${escapeHtml(c.batch)}</td>` : ''}
             ${cols.seq ? `<td class="py-2 px-3 font-mono text-xs text-parchment-300">#${escapeHtml(c.seq)}</td>` : ''}
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(c.name)}', '${escapeJs(c.tcgId)}', '${escapeJs(c.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
+              <button onclick="openInspectModal('${escapeJs(c.name)}', '${escapeJs(c.tcgId)}', '${escapeJs(c.set)}', '${escapeJs(c.number || '')}', '${escapeJs(c.printing || '')}', false)" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(c.name)}
               </button>${foilIconHtml(c.printing)}
             </td>
@@ -3244,6 +3244,7 @@
             set: c.set || '—',
             meta: `${c.rarity || 'Common'} • ${c.condition || 'NM'}`,
             printing: c.printing || '',
+            number: c.number || '',
             price: effectiveCardPrice(c),
             priceApprox: c.priceSrc === 'approx',
             tcgId: c.tcgId || ''
@@ -3340,7 +3341,7 @@
             <td class="py-2 px-4">${sourceBadge}</td>
             <td class="py-2 px-4">${locBadge}</td>
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(item.name)}', '${escapeJs(item.tcgId)}', '${escapeJs(item.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
+              <button onclick="openInspectModal('${escapeJs(item.name)}', '${escapeJs(item.tcgId)}', '${escapeJs(item.set)}', '${escapeJs(item.number || '')}', '${escapeJs(item.printing || '')}', ${item.source === 'MISSING'})" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(item.name)}
               </button>${foilIconHtml(item.printing)}
             </td>
@@ -5253,7 +5254,30 @@
       });
     }
 
-    async function openInspectModal(cardName, tcgId, setHint) {
+    // Finds the Scryfall card that matches what's actually listed: the exact printing for batch cards, the oldest printing for Missing cards.
+    async function findInspectCard(clean, setName, number, isMissing) {
+      const get = async url => { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+      if (isMissing) {
+        const d = await get(`${SCRYFALL_API}/cards/search?q=${encodeURIComponent('!"' + clean + '" include:extras')}&unique=prints&order=released&dir=asc`);
+        const first = d && (d.data || []).find(x => sameCardName(clean, x.name));
+        if (first) return { card: first, how: 'oldest' };
+      } else {
+        let code = null;
+        try { await ensureScryfallSets(); code = resolveSetCode(setName); } catch (e) {}
+        if (code) {
+          if (number) {
+            const c1 = await get(`${SCRYFALL_API}/cards/${code}/${encodeURIComponent(cnNorm(number))}`);
+            if (c1 && sameCardName(clean, c1.name)) return { card: c1, how: 'exact' };
+          }
+          const c2 = await get(`${SCRYFALL_API}/cards/named?exact=${encodeURIComponent(clean)}&set=${code}`);
+          if (c2 && sameCardName(clean, c2.name)) return { card: c2, how: 'exact' };
+        }
+      }
+      const f = await get(`${SCRYFALL_API}/cards/named?fuzzy=${encodeURIComponent(clean)}`);
+      return f ? { card: f, how: 'default' } : null;
+    }
+
+    async function openInspectModal(cardName, tcgId, setHint, number, printing, isMissing) {
       const modal = document.getElementById('inspectModal');
       const title = document.getElementById('inspectModalTitle');
       const content = document.getElementById('inspectModalContent');
@@ -5265,15 +5289,18 @@
       modal.classList.remove('hidden');
 
       try {
-        const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(clean)}`);
-        if (res.ok) {
-          const card = await res.json();
+        const found = await findInspectCard(clean, setHint, number, isMissing);
+        if (found) {
+          const card = found.card;
+          const finish = finishOf(printing);
           const imgUrl = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '';
-          const usd = card.prices?.usd || card.prices?.usd_foil || null;
-          if (usd) {
-            priceCache[normalizeCardName(clean)] = parseFloat(usd);
-            saveAppState();
-          }
+          let usd = finish === 'normal' ? printingPriceFor(card, 'normal') : printingPriceFor(card, finish);
+          if (found.how === 'default' && finish === 'normal' && usd) { priceCache[normalizeCardName(clean)] = usd; saveAppState(); }
+          const printNote = found.how === 'exact'
+            ? `Showing your exact printing: ${card.set_name} #${card.collector_number}${finish !== 'normal' ? ' (' + (finish === 'etched' ? 'Etched foil' : 'Foil') + ')' : ''}`
+            : found.how === 'oldest'
+              ? `Showing the oldest printing: ${card.set_name} #${card.collector_number}`
+              : `Couldn't match the listed printing, so this is Scryfall's default printing: ${card.set_name} #${card.collector_number}`;
           content.innerHTML = `
             <div class="sm:col-span-5 flex justify-center">
               ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(card.name)}" class="rounded-xl max-h-80 shadow-xl border border-white/10" />` : `<div class="p-8 rounded-xl bg-obsidian-900 text-xs text-parchment-400">No Image</div>`}
@@ -5281,6 +5308,7 @@
             <div class="sm:col-span-7 space-y-3 text-xs">
               <div class="text-base font-bold text-parchment-100">${escapeHtml(card.name)} <span class="text-gold-300 whitespace-nowrap">${manaSymbolsHtml(card.mana_cost || (card.card_faces || []).map(f => f.mana_cost).filter(Boolean).join(' // '), 1.25)}</span></div>
               <div class="text-parchment-300 font-semibold">${escapeHtml(card.type_line || '')}</div>
+              <div class="text-[11px] ${found.how === 'default' ? 'text-amber-300' : 'text-parchment-400'}">${escapeHtml(printNote)}</div>
               ${(() => {
                 const tags = [];
                 if (isStapleCard(card.name) || isStapleCard(clean)) tags.push('<span class="staple-tag" title="On your Staples list">★ Staple</span>');
@@ -5289,8 +5317,9 @@
               })()}
               <p class="text-parchment-200 whitespace-pre-line bg-obsidian-900/80 p-3 rounded-xl border border-white/10">${manaSymbolsHtml(card.oracle_text || card.card_faces?.[0]?.oracle_text || '—', 1.1)}</p>
               <div class="flex items-center justify-between pt-2">
-                <span class="font-mono text-emerald-400 font-bold text-sm">TCGplayer NM: ${usd ? `$${Number(usd).toFixed(2)}` : 'N/A'}</span>
+                <span class="font-mono text-emerald-400 font-bold text-sm">TCGplayer${finish !== 'normal' ? ' foil' : ' NM'}: ${usd ? `$${Number(usd).toFixed(2)}` : 'N/A'}</span>
                 <div class="flex gap-2">
+                  ${card.scryfall_uri ? `<a href="${escapeHtml(card.scryfall_uri)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-purple-400 text-obsidian-950 font-bold">Scryfall ↗</a>` : ''}
                   <a href="${buildTcgLink(cardName, tcgId)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-sky-500 text-obsidian-950 font-bold">TCGplayer ↗</a>
                   <a href="${buildCardKingdomLink(cardName)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-amber-400 text-obsidian-950 font-bold">Card Kingdom ↗</a>
                 </div>
