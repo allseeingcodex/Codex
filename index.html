@@ -4422,5 +4422,31 @@ if(t.id==="inscribeTextarea"){if(e.metaKey||e.ctrlKey){e.preventDefault();press(
 var fn=M[t.id];if(!fn)return;e.preventDefault();press(t,fn);},true);
 })();
 </script>
+<script>
+(function(){
+var URL_="https://script.google.com/macros/s/AKfycbztyn9MO86NFbKFGSe1ev5TdOq87Bw6MdJXHo-VA2vOAKS3m3ugPbyrV4i2zDEubhg/exec";
+function tok(){try{return window.__codexGetTok()||"";}catch(e){return "";}}
+function staff(){try{return !!isAdminOrOwner();}catch(e){return false;}}
+function post(d){return fetch(URL_,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(d)}).then(function(r){return r.json();});}
+function sortLog(){try{changeLogEntries.sort(function(a,b){return String(b.timestamp).localeCompare(String(a.timestamp));});}catch(e){}}
+var orr=window.renderChangeLogTable;
+if(typeof orr==="function")window.renderChangeLogTable=function(){sortLog();return orr.apply(this,arguments);};
+var orc=window.recordChangeLog;
+if(typeof orc==="function")window.recordChangeLog=function(){var r=orc.apply(this,arguments);try{if(staff()&&tok()){var e=changeLogEntries[0];if(e&&String(e.id).indexOf("log-seed")!==0){post({action:"logAdd",token:tok(),entry:e}).catch(function(){});}}}catch(x){}return r;};
+var ou=window.undoChangeLogEntry;
+if(typeof ou==="function")window.undoChangeLogEntry=async function(id){var was=false,e0,e1;try{e0=changeLogEntries.filter(function(e){return e.id===id;})[0];was=!!(e0&&e0.undone);}catch(x){}var r=await ou.apply(this,arguments);try{e1=changeLogEntries.filter(function(e){return e.id===id;})[0];if(e1&&e1.undone&&!was&&tok()){post({action:"logMark",token:tok(),id:id}).catch(function(){});}}catch(x){}return r;};
+var busy=false;
+function pull(){if(busy||!staff()||!tok())return;busy=true;post({action:"logGet",token:tok()}).then(function(r){busy=false;if(!r||!r.ok||!r.entries)return;var map={},i,e,out=[],mine=[];for(i=0;i<r.entries.length;i++){map[r.entries[i].id]=1;out.push(r.entries[i]);}
+for(i=0;i<changeLogEntries.length;i++){e=changeLogEntries[i];if(!map[e.id]){out.push(e);if(String(e.id).indexOf("log-seed")!==0&&String(e.actorEmail).toLowerCase()===String(currentAccountEmail||"").toLowerCase())mine.push(e);}}
+out.sort(function(a,b){return String(b.timestamp).localeCompare(String(a.timestamp));});if(out.length>500)out.length=500;changeLogEntries.length=0;for(i=0;i<out.length;i++)changeLogEntries.push(out[i]);
+try{renderChangeLogTable();renderAdminConsole();}catch(x){}
+for(i=0;i<mine.length&&i<20;i++){post({action:"logAdd",token:tok(),entry:mine[i]}).catch(function(){});}
+}).catch(function(){busy=false;});}
+var sw=window.switchTab;
+if(typeof sw==="function")window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==="changelog")pull();return r;};
+setTimeout(pull,3000);setTimeout(pull,9000);setInterval(function(){if(!document.hidden)pull();},45000);
+window.refreshChangeLog=pull;
+})();
+</script>
 </body>
 </html>
