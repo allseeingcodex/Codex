@@ -4443,8 +4443,8 @@ try{renderChangeLogTable();renderAdminConsole();}catch(x){}
 for(i=0;i<mine.length&&i<20;i++){post({action:"logAdd",token:tok(),entry:mine[i]}).catch(function(){});}
 }).catch(function(){busy=false;});}
 var sw=window.switchTab;
-if(typeof sw==="function")window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==="changelog")pull();return r;};
-setTimeout(pull,3000);setTimeout(pull,9000);setInterval(function(){if(!document.hidden)pull();},45000);
+if(typeof sw==="function")window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==="changelog"){try{renderChangeLogTable();}catch(x){}pull();}return r;};
+var tries=0,fast=setInterval(function(){tries++;if(staff()&&tok()){pull();clearInterval(fast);}else if(tries>=20){clearInterval(fast);}},2000);setInterval(function(){if(!document.hidden)pull();},45000);
 window.refreshChangeLog=pull;
 })();
 </script>
