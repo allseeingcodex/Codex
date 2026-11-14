@@ -4395,5 +4395,23 @@ if(document.readyState==="complete")go();else window.addEventListener("load",go)
 <script>document.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.shiftKey||e.isComposing)return;var id=e.target&&e.target.id;if(id==="authModalLoginPassword"){e.preventDefault();loginSelectedAccountFromModal();}else if(id==="authSignUpName"||id==="authSignUpEmail"||id==="authSignUpPassword"||id==="authSignUpPassword2"){e.preventDefault();signUpNewAccountFromModal();}},true);</script>
 <script>(function(){var s=window.switchTab;if(typeof s!=="function")return;window.switchTab=function(id){if((id==="users"||id==="changelog")&&!isAdminOrOwner())return;return s.apply(this,arguments);};})();</script>
 <script>(function(){var ts=window.showToast;function note(id,msg,ok){var e=document.getElementById(id);if(!e)return;e.textContent=(ok?"\u2713 ":"")+msg;e.className="text-xs font-semibold px-2 py-1.5 rounded-lg border "+(ok?"text-emerald-300 bg-emerald-500/10 border-emerald-500/30":"text-rose-300 bg-rose-500/10 border-rose-500/30");clearTimeout(e._t);e._t=setTimeout(function(){e.className="hidden";},6000);}window.showToast=function(title,msg){var r=ts.apply(this,arguments);try{var g=function(x){var el=document.getElementById(x);return el?el.value:"";};if(title==="Profile Saved"){note("profileSaveNote",msg==="Your profile was updated."?"Profile updated!":msg,true);}else if(title==="Could Not Save"){note("profileSaveNote",msg,false);}else if(title==="Password Too Short"){note(g("authCurrentPasswordInput")&&!g("authSignUpPassword")?"profileSaveNote":"signUpNote",msg,false);}else if(title==="Valid Email Required"||title==="Passwords Do Not Match"||title==="Sign Up Failed"){note("signUpNote",msg,false);}}catch(x){}return r;};})();</script>
+<script>
+(function(){
+var cache={};
+function lev(a,b){var m=a.length,n=b.length,i,j,p=[],c,prev;for(j=0;j<=n;j++)p[j]=j;for(i=1;i<=m;i++){prev=p[0];p[0]=i;for(j=1;j<=n;j++){c=p[j];p[j]=Math.min(p[j]+1,p[j-1]+1,prev+(a.charAt(i-1)===b.charAt(j-1)?0:1));prev=c;}}return p[n];}
+function titleCase(s){var small=" a an and as at but by for in of on or the to ";return s.toLowerCase().split(" ").map(function(w,i){if(i>0&&small.indexOf(" "+w+" ")>=0)return w;return w.split("-").map(function(p){return p.charAt(0).toUpperCase()+p.slice(1);}).join("-");}).join(" ");}
+function localMatch(s){var low=s.toLowerCase(),best=null,bd=99,tie=false,seen={},names=[],i,nm,k,d,lim;try{names=(vaultCards||[]).concat(missingCards||[]).map(function(c){return c.name;});}catch(e){}
+for(i=0;i<names.length;i++){nm=String(names[i]||"");k=nm.toLowerCase();if(seen[k])continue;seen[k]=1;if(k===low)return nm;d=lev(low,k);lim=Math.max(1,Math.floor(low.length/8));if(d<=lim){if(d<bd){bd=d;best=nm;tie=false;}else if(d===bd){tie=true;}}}
+return(best&&!tie)?best:null;}
+async function resolveName(raw){var s=String(raw||"").replace(/\s*\([^)]*\)\s*$/,"").replace(/\s+/g," ").trim();if(!s)return String(raw||"").trim();var key=s.toLowerCase();if(cache[key])return cache[key];var out=null;
+try{var ctl=new AbortController();var tm=setTimeout(function(){ctl.abort();},5000);var r=await fetch("https://api.scryfall.com/cards/named?fuzzy="+encodeURIComponent(s),{signal:ctl.signal});clearTimeout(tm);if(r.ok){var d=await r.json();if(d&&d.name)out=d.name;}}catch(e){}
+if(!out)out=localMatch(s);if(!out)out=titleCase(s);cache[key]=out;return out;}
+window.resolveCardName=resolveName;
+var fo=window.fetchOldestPrintingFromScryfall;
+if(typeof fo==="function")window.fetchOldestPrintingFromScryfall=async function(n){var r=await resolveName(n);return fo.call(this,r);};
+var oa=window.adminManualAddMissingCard;
+if(typeof oa==="function")window.adminManualAddMissingCard=async function(){var el=document.getElementById("manualMissingName");var raw=el?(el.value||"").trim():"";var fixed=raw;if(raw){try{fixed=await resolveName(raw);}catch(e){}if(el&&fixed&&fixed!==raw)el.value=fixed;}var res=await oa.apply(this,arguments);if(raw&&fixed&&fixed!==raw&&el&&el.value===""){showToast("Name Corrected","Added as "+fixed+" (you typed "+raw+").");}return res;};
+})();
+</script>
 </body>
 </html>
