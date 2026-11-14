@@ -1995,7 +1995,7 @@
         const sPrices = localStorage.getItem(STORAGE_KEY_PRICES);
         priceCache = sPrices ? JSON.parse(sPrices) : {};
         vaultCards.forEach(c => {
-          if (c.price != null) priceCache[normalizeCardName(c.name)] = c.price;
+          if (c.price != null) priceCache[priceCacheKey(c.name, c.printing)] = c.price;
         });
 
         const sProfiles = localStorage.getItem(STORAGE_KEY_PROFILES);
@@ -2448,10 +2448,29 @@
       return { missingMap, vaultByNormName };
     }
 
-    function getCardPrice(cardName, explicitPrice) {
+    // Foil copies use the foil price. Cache keys: "name" (normal), "name|foil", "name|etched".
+    function isFoilPrinting(printing) { return /foil|etched/i.test(String(printing || '')); }
+    function priceCacheKey(cardName, printing) {
+      const norm = normalizeCardName(cardName);
+      if (!isFoilPrinting(printing)) return norm;
+      return norm + (/etched/i.test(String(printing)) ? '|etched' : '|foil');
+    }
+    function cachedPriceFor(cardName, printing) {
+      const key = priceCacheKey(cardName, printing);
+      let v = priceCache[key];
+      if (v == null && key.endsWith('|etched')) v = priceCache[normalizeCardName(cardName) + '|foil'];
+      return v != null ? Number(v) : null;
+    }
+    // Saves Scryfall's foil / etched prices (TCGplayer market) next to the normal price.
+    function storeFoilPrices(card, cardName) {
+      const norm = normalizeCardName(cardName || card.name);
+      const foil = card.prices?.usd_foil, etched = card.prices?.usd_etched;
+      if (foil) priceCache[norm + '|foil'] = parseFloat(foil);
+      if (etched) priceCache[norm + '|etched'] = parseFloat(etched);
+    }
+    function getCardPrice(cardName, explicitPrice, printing) {
       if (explicitPrice != null && !isNaN(explicitPrice)) return Number(explicitPrice);
-      const cached = priceCache[normalizeCardName(cardName)];
-      return cached != null ? Number(cached) : null;
+      return cachedPriceFor(cardName, printing);
     }
 
     function refreshAllViews() {
@@ -2748,7 +2767,7 @@
           _idx: idx,
           batchNum: bNum,
           isMatch,
-          effectivePrice: getCardPrice(c.name, c.price)
+          effectivePrice: getCardPrice(c.name, c.price, c.printing)
         };
       }).filter(c => {
         if (!visibleBatchNumbers.has(c.batchNum)) return false;
@@ -3147,7 +3166,7 @@
             isStaple: isStapleCard(c.name),
             set: c.set || '—',
             meta: `${c.rarity || 'Common'} • ${c.condition || 'NM'}`,
-            price: getCardPrice(c.name, c.price),
+            price: getCardPrice(c.name, c.price, c.printing),
             tcgId: c.tcgId || ''
           });
         });
@@ -3284,6 +3303,7 @@
             const data = await res.json();
             (data.data || []).forEach(card => {
               const p = card.prices?.usd || card.prices?.usd_foil;
+              storeFoilPrices(card, card.name);
               if (p) {
                 priceCache[normalizeCardName(card.name)] = parseFloat(p);
                 updatedCount++;
@@ -3301,7 +3321,7 @@
         if (p != null) m.price = p;
       });
       vaultCards.forEach(v => {
-        const p = priceCache[normalizeCardName(v.name)];
+        const p = cachedPriceFor(v.name, v.printing);
         if (p != null) v.price = p;
       });
 
@@ -3978,6 +3998,7 @@
 
             const p = card.prices?.usd || card.prices?.usd_foil;
             if (p) priceCache[normalizeCardName(clean)] = parseFloat(p);
+            storeFoilPrices(card, clean);
             return {
               name: card.name || clean,
               set: (card.set || '—').toUpperCase(),
@@ -4660,7 +4681,7 @@
             if (Array.isArray(data.vaultCards) && data.vaultCards.length > 0) {
               vaultCards = data.vaultCards.map(v => ({
                 ...v,
-                price: priceCache[normalizeCardName(v.name)] ?? null
+                price: cachedPriceFor(v.name, v.printing)
               }));
               vaultCards.forEach(c => visibleBatchNumbers.add(c.batchNum || extractBatchNumber(c.batch)));
             }
@@ -4923,6 +4944,7 @@
           const usd = card.prices?.usd || card.prices?.usd_foil || null;
           if (usd) {
             priceCache[normalizeCardName(clean)] = parseFloat(usd);
+            storeFoilPrices(card, clean);
             saveAppState();
           }
           content.innerHTML = `
@@ -5057,8 +5079,8 @@ var srvV=null,srvM=null,loaded=false,timer=null,busy=false,lastSig="",origSave=w
 function sig(d){var h=0,s=d.cards.length+":"+d.missing.length+"|";for(var i=0;i<d.cards.length;i++){var a=d.cards[i];s+=a[0]+a[1]+a[2]+a[7]+";";}for(var j=0;j<d.missing.length;j++){s+=d.missing[j][0]+";";}for(var k=0;k<s.length;k++){h=(h*31+s.charCodeAt(k))|0;}return s.length+":"+h;}
 function pending(){var cs=new Set(vaultCards.map(vKey));if(cs.size!==srvV.size)return true;var bad=false;cs.forEach(function(k){if(!srvV.has(k))bad=true;});if(bad)return true;var ms=new Set(missingCards.map(function(m){return m.name.toLowerCase();}));if(ms.size!==srvM.size)return true;ms.forEach(function(k){if(!srvM.has(k))bad=true;});return bad;}
 function vKey(c){return c.batch+"|"+c.seq+"|"+String(c.name).toLowerCase();}
-function pc(n){try{var x=priceCache[normalizeCardName(n)];return x===undefined?null:x;}catch(e){return null;}}
-function toCard(a){return {name:a[2],number:a[3],condition:a[4],printing:a[5],rarity:a[6],qty:Number(a[7])||1,seq:isNaN(Number(a[1]))?a[1]:Number(a[1]),batch:a[0],batchNum:extractBatchNumber(a[0]),set:a[8],tcgId:a[9],price:pc(a[2])};}
+function pc(n,pr){try{var x=cachedPriceFor(n,pr);return x===undefined?null:x;}catch(e){return null;}}
+function toCard(a){return {name:a[2],number:a[3],condition:a[4],printing:a[5],rarity:a[6],qty:Number(a[7])||1,seq:isNaN(Number(a[1]))?a[1]:Number(a[1]),batch:a[0],batchNum:extractBatchNumber(a[0]),set:a[8],tcgId:a[9],price:pc(a[2],a[5])};}
 function toArr(c){return [String(c.batch),String(c.seq),String(c.name),String(c.number||""),String(c.condition||"Near Mint"),String(c.printing||"Normal"),String(c.rarity||"Common"),Number(c.qty)||1,String(c.set||""),String(c.tcgId||"")];}
 function mArr(m){return [String(m.name),String(m.color||"C"),(m.set&&m.set!=="\u2014")?String(m.set):""];}
 function applyData(d){vaultCards=d.cards.map(toCard);missingCards=d.missing.map(function(m,i){return {id:"m-"+(i+1),name:m[0],color:m[1]||"C",set:m[2]||"\u2014",price:pc(m[0])};});lastSig=sig(d);srvV=new Set(vaultCards.map(vKey));srvM=new Set(missingCards.map(function(m){return m.name.toLowerCase();}));loaded=true;vaultCards.forEach(function(c){visibleBatchNumbers.add(c.batchNum);});origSave();refreshAllViews();}
