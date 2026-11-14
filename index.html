@@ -2888,6 +2888,7 @@
         if (!names.length) throw new Error('Empty Standard list');
         try { localStorage.setItem(STANDARD_CACHE_KEY, JSON.stringify({ ts: Date.now(), names })); } catch (e) {}
         standardLegalSet = buildStandardSet(names);
+        stampStandardOnAllCards();
         return standardLegalSet;
       })().finally(() => {
         standardLegalLoading = null;
@@ -2896,9 +2897,51 @@
       return standardLegalLoading;
     }
     function isStandardLegalName(name) {
-      if (!standardLegalSet) return false;
       const k = standardKey(name);
-      return standardLegalSet.has(k) || (k.includes(' // ') && standardLegalSet.has(k.split(' // ')[0].trim()));
+      if (standardLegalSet) {
+        return standardLegalSet.has(k) || (k.includes(' // ') && standardLegalSet.has(k.split(' // ')[0].trim()));
+      }
+      // No list in memory: fall back to the tag saved on the cards themselves.
+      return !!(storedStandardMap && storedStandardMap.get(k));
+    }
+
+    // ---- Standard tag saved on each card (card.standard = true/false) ----
+    // Stamped when cards are added (Inscribe lookup, CSV batch upload, sheet sync) or when the
+    // Standard list refreshes, so filtering can be instant without downloading anything.
+    const STANDARD_STAMP_KEY = 'codex_standard_stamp_v1';
+    let storedStandardMap = null;
+    function allTaggableCards() { return vaultCards.concat(missingCards); }
+    function cardsMissingStandardTag() {
+      return allTaggableCards().some(c => typeof c.standard !== 'boolean');
+    }
+    function rebuildStoredStandardMap() {
+      storedStandardMap = new Map();
+      allTaggableCards().forEach(c => { if (typeof c.standard === 'boolean') storedStandardMap.set(standardKey(c.name), c.standard); });
+    }
+    function standardStampIsStale() {
+      return (Date.now() - Number(localStorage.getItem(STANDARD_STAMP_KEY) || 0)) > STANDARD_CACHE_MAX_AGE_MS;
+    }
+    // Writes card.standard onto every card from the loaded Standard list. Returns how many cards are Standard legal.
+    function stampStandardOnAllCards() {
+      if (!standardLegalSet) return 0;
+      let legal = 0;
+      allTaggableCards().forEach(c => {
+        c.standard = isStandardLegalName(c.name);
+        if (c.standard) legal++;
+      });
+      try { localStorage.setItem(STANDARD_STAMP_KEY, String(Date.now())); } catch (e) {}
+      rebuildStoredStandardMap();
+      saveAppState();
+      return legal;
+    }
+    // Tags any untagged cards (uses the cached Standard list, downloading it only if needed).
+    function autoTagStandardInBackground(announce) {
+      if (!cardsMissingStandardTag()) return;
+      const had = !!standardLegalSet || loadStandardFromCache();
+      ensureStandardLegalSet().then(() => {
+        const legal = stampStandardOnAllCards();
+        if (announce && !had) showToast('Standard tags saved', `${legal.toLocaleString()} of ${allTaggableCards().length.toLocaleString()} cards are Standard legal. Filtering by Standard is now instant.`);
+      }).catch(err => console.warn('Standard tagging skipped:', err));
     }
 
     // Staple cards: highlighted purple in Search and filterable with "Staples only".
@@ -3035,7 +3078,16 @@
     function cardFlagFilterReady(prefix, rerender) {
       const std = document.getElementById(prefix + 'StandardOnly');
       if (!std || !std.checked) return true;
-      if (standardLegalSet || loadStandardFromCache()) return true;
+      if (standardLegalSet || loadStandardFromCache()) {
+        if (cardsMissingStandardTag()) stampStandardOnAllCards();
+        return true;
+      }
+      if (!cardsMissingStandardTag() && allTaggableCards().length > 0) {
+        // Every card already carries its Standard tag: filter instantly, refresh quietly if the tags are old.
+        rebuildStoredStandardMap();
+        if (standardStampIsStale()) ensureStandardLegalSet().then(() => rerender()).catch(() => {});
+        return true;
+      }
       ensureStandardLegalSet().then(() => rerender()).catch(err => {
         console.warn('Standard list error:', err);
         std.checked = false;
@@ -3892,7 +3944,8 @@
               name: card.name || clean,
               set: (card.set || '—').toUpperCase(),
               color: colorCode,
-              price: p ? parseFloat(p) : null
+              price: p ? parseFloat(p) : null,
+              standard: card.legalities ? card.legalities.standard === 'legal' : undefined
             };
           }
         }
@@ -3943,7 +3996,8 @@
           name: item.name,
           color: item.color,
           set: item.set,
-          price: item.price
+          price: item.price,
+          ...(typeof item.standard === 'boolean' ? { standard: item.standard } : {})
         });
       });
       inscribedPreviewList = [];
@@ -3952,6 +4006,7 @@
       refreshAllViews();
       switchTab('missing');
       showToast('Missing Cards Saved', 'Added cards to your Missing Cards list.');
+      autoTagStandardInBackground(false);
     }
 
     function parseCsvLine(line) {
@@ -4051,6 +4106,7 @@
             saveAppState();
             refreshAllViews();
             switchTab('vaults');
+            autoTagStandardInBackground(true);
             const rejNotice = rejectedFiles.length > 0
               ? ` (Rejected ${rejectedFiles.length} invalid file name(s): ${rejectedFiles.join(', ')})`
               : '';
@@ -4573,6 +4629,7 @@
             updateLastSyncedUI(new Date().toISOString());
             saveAppState();
             refreshAllViews();
+            autoTagStandardInBackground(false);
             if (!silent) showToast('Backup/Update Complete', `Synced ${missingCards.length} Missing Cards and ${vaultCards.length.toLocaleString()} Batch Cards with "${baseSheetName}".`);
             return true;
           }
@@ -4612,6 +4669,7 @@
           updateLastSyncedUI(new Date().toISOString());
           saveAppState();
           refreshAllViews();
+          autoTagStandardInBackground(false);
           if (!silent) {
             showToast('Backup/Update Complete', addedFromSheet > 0 ? `Backed up database & pulled ${addedFromSheet} new card(s) from Google Sheet.` : `All ${missingCards.length} Missing Cards & ${vaultCards.length.toLocaleString()} Batch Cards are backed up and in sync.`);
           }
