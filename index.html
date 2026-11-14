@@ -4589,30 +4589,39 @@ function list(a){var l=a.slice(0,10).map(function(n){return "<li>"+esc(n)+"</li>
 function rec(cat,label,sum,undo){try{recordChangeLog(cat,label,sum,undo);}catch(e){}}
 function sig(c){return normalizeCardName(c.name)+"|"+c.batch+"|"+c.seq;}
 
+function notice(msg){
+try{
+var d=document.createElement("div");
+d.style.cssText="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:99999;max-width:92vw;padding:12px 18px;border-radius:12px;background:#065f46;border:1px solid #34d399;color:#ecfdf5;font:600 13px/1.4 system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.55);opacity:0;transition:opacity .25s";
+d.textContent="\u2713 "+msg;
+document.body.appendChild(d);
+requestAnimationFrame(function(){d.style.opacity="1";});
+setTimeout(function(){d.style.opacity="0";setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},300);},4500);
+}catch(e){}}
+var orc=window.recordChangeLog;
+if(typeof orc==="function")window.recordChangeLog=function(cat,label,sum){
+var r=orc.apply(this,arguments);
+if(cat==="ADD")notice(String(sum||label||"Added").replace(/\.$/,"")+" \u2014 saved.");
+return r;};
 var oc=window.commitInscribedCardsToGrimoire;
 if(typeof oc==="function")window.commitInscribedCardsToGrimoire=function(){
-var self=this,args=arguments,L;
-try{L=inscribedPreviewList.slice();}catch(e){L=[];}
-if(!L.length)return oc.apply(self,args);
-confirmBox("Add these cards?","Add <b>"+L.length+"</b> card"+(L.length===1?"":"s")+" to Missing Cards?"+list(L.map(function(c){return c.name;})),"Add to Missing Cards",function(){
-var m0={};try{missingCards.forEach(function(c){m0[c.id]=1;});}catch(e){}
+var self=this,args=arguments,m0={};
+try{if(!inscribedPreviewList.length)return oc.apply(self,args);}catch(e){}
+try{missingCards.forEach(function(c){m0[c.id]=1;});}catch(e){}
 var r=oc.apply(self,args);
 try{var nm=missingCards.filter(function(c){return !m0[c.id];});
 if(nm.length){var n=nm.map(function(c){return '"'+c.name+'"';});
 rec("ADD",nm.length>1?"Added "+nm.length+" via Add Missing Cards":"Added via Add Missing Cards","Added "+(n.length>3?n.slice(0,3).join(", ")+" and "+(n.length-3)+" more":n.join(", "))+" from the Add Missing Cards tab.",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});}}catch(e){}
-});};
-
+return r;};
 var oh=window.handleRocaCsvUpload,pendCsv=null;
 if(typeof oh==="function")window.handleRocaCsvUpload=function(event){
-var self=this,files=[];
+var files=[];
 try{files=Array.from(event.target.files||[]);}catch(e){}
 var valid=files.filter(function(f){return /^Batch-\d+\.csv$/i.test(f.name.trim());});
-if(!valid.length)return oh.call(self,event);
-confirmBox("Import these CSV files?","Import <b>"+valid.length+"</b> file"+(valid.length===1?"":"s")+" into the Batches?"+list(valid.map(function(f){return f.name;})),"Import",function(){
+if(valid.length){
 var v0={};try{vaultCards.forEach(function(c){v0[sig(c)]=1;});}catch(e){}
-pendCsv={v0:v0,names:valid.map(function(f){return f.name;})};
-oh.call(self,event);
-},function(){try{event.target.value="";}catch(e){}});};
+pendCsv={v0:v0,names:valid.map(function(f){return f.name;})};}
+return oh.call(this,event);};
 var ot=window.showToast;
 if(typeof ot==="function")window.showToast=function(title){
 var r=ot.apply(this,arguments);
