@@ -252,6 +252,9 @@
     }
 
     /* Foil card icon (shown next to foil cards, like Moxfield) */
+    tr.dup-row { background: rgba(244,63,94,0.12) !important; box-shadow: inset 3px 0 0 #fb7185; }
+    .dup-badge { display: inline-block; margin-left: .5rem; padding: 0 .4rem; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .03em;
+      background: rgba(244,63,94,0.2); color: #fda4af; border: 1px solid rgba(251,113,133,0.55); vertical-align: middle; cursor: help; }
     #codex-tip { position: fixed; z-index: 99999; max-width: 260px; padding: 6px 10px; border-radius: 8px; font-size: 12px; line-height: 1.35;
       background: #0f172a; color: #f8fafc; border: 1px solid rgba(251,191,36,0.6); box-shadow: 0 6px 20px rgba(0,0,0,0.45);
       pointer-events: none; opacity: 0; transition: opacity .08s; }
@@ -877,7 +880,12 @@
       <div class="arcane-card rounded-xl overflow-hidden">
         <div class="px-4 py-2 border-b border-white/10 bg-obsidian-900/80 flex items-center justify-between text-xs text-parchment-300">
           <span id="missingShowingLabel">Showing 291 Missing Cards</span>
-          <span class="font-mono text-[11px] text-parchment-400">Click any column header to sort</span>
+          <span class="flex items-center gap-3">
+            <button id="deleteDuplicatesBtn" onclick="deleteMissingDuplicates()" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-400/40 text-xs font-semibold cursor-pointer transition disabled:opacity-40 disabled:cursor-default" disabled>
+              <i class="fa-solid fa-clone mr-1"></i>Delete Duplicates
+            </button>
+            <span class="font-mono text-[11px] text-parchment-400">Click any column header to sort</span>
+          </span>
         </div>
         <div class="overflow-x-auto max-h-[70vh]">
           <table class="w-full text-left border-collapse">
@@ -2531,7 +2539,7 @@
       document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) hide(); });
       document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) show(t); });
       document.addEventListener('focusout', hide);
-      document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) { current === t ? hide() : show(t); e.stopPropagation(); } else hide(); }, true);
+      document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && e.target.closest('button, a')) { hide(); return; } if (t) { current === t ? hide() : show(t); e.stopPropagation(); } else hide(); }, true);
       window.addEventListener('scroll', hide, true);
     })();
     function vaultRecordKey(c) { return String(c.batch) + '|' + String(c.seq) + '|' + String(c.name).toLowerCase(); }
@@ -2718,10 +2726,19 @@
       const stFilter = document.getElementById('missingStatusFilter')?.value || 'ALL';
       if (!cardFlagFilterReady('missing', renderMissingTable)) return;
 
+      const dupCounts = new Map();
+      missingCards.forEach(m => { const k = normalizeCardName(m.name); dupCounts.set(k, (dupCounts.get(k) || 0) + 1); });
+      const extraCopies = missingCards.length - dupCounts.size;
+      const dupBtn = document.getElementById('deleteDuplicatesBtn');
+      if (dupBtn) {
+        dupBtn.disabled = extraCopies === 0;
+        dupBtn.innerHTML = `<i class="fa-solid fa-clone mr-1"></i>Delete Duplicates${extraCopies ? ` (${extraCopies})` : ''}`;
+      }
       let rows = missingCards.map(m => {
         const hits = vaultByNormName.get(normalizeCardName(m.name)) || [];
         return {
           ...m,
+          dupCount: dupCounts.get(normalizeCardName(m.name)) || 1,
           hits,
           isLocated: hits.length > 0,
           effectivePrice: effectiveCardPrice(m)
@@ -2767,12 +2784,12 @@
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
-          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${m.isLocated ? 'located-row-glow' : ''}">
+          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${m.isLocated ? 'located-row-glow' : ''} ${m.dupCount > 1 ? 'dup-row' : ''}">
             ${cols.status ? `<td class="py-2 px-4 whitespace-nowrap">${statusHtml}</td>` : ''}
-            <td class="py-2 px-4">
+            <td class="py-2 px-4"${m.dupCount > 1 ? ` data-tip="Duplicate: this card is on the Missing list ${m.dupCount} times. Use Delete Duplicates to keep just one."` : ''}>
               <button onclick="openInspectModal('${escapeJs(m.name)}', '', '${escapeJs(m.set)}', '', '', true)" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(m.name)}
-              </button>
+              </button>${m.dupCount > 1 ? `<span class="dup-badge">DUPLICATE ×${m.dupCount}</span>` : ''}
             </td>
             ${cols.color ? `<td class="py-2 px-3"><span class="mana-badge mana-${escapeHtml(m.color || 'C')}"><span class="mana-dot"></span>${escapeHtml(m.color || 'C')}</span></td>` : ''}
             ${cols.set ? `<td class="py-2 px-3 font-mono text-xs text-parchment-200">${escapeHtml(m.set || '—')}</td>` : ''}
@@ -4080,6 +4097,29 @@
         saveAppState();
         refreshAllViews();
         await syncChangesToSheetInBackground(`Moved "${target.name}" to Recently Deleted (7 days) & updated ${baseSheetName}.`);
+      });
+    }
+
+    // Missing cards should only appear once. Keeps one entry per card (preferring one that has a real set code, otherwise the first listed).
+    function deleteMissingDuplicates() {
+      if (!requireAuthenticatedAccount('delete missing cards')) return;
+      const keepFor = new Map();
+      missingCards.forEach(m => {
+        const k = normalizeCardName(m.name);
+        const cur = keepFor.get(k);
+        const hasSet = x => x.set && x.set !== '—';
+        if (!cur || (!hasSet(cur) && hasSet(m))) keepFor.set(k, m);
+      });
+      const toRemove = missingCards.filter(m => keepFor.get(normalizeCardName(m.name)) !== m);
+      if (!toRemove.length) { showToast('No Duplicates', 'Every card on the Missing list appears only once.'); return; }
+      const names = Array.from(new Set(toRemove.map(m => m.name)));
+      requestDeleteConfirmation(`Delete ${toRemove.length} duplicate entr${toRemove.length === 1 ? 'y' : 'ies'} from Missing Cards (${names.slice(0, 5).join(', ')}${names.length > 5 ? ', …' : ''}). One copy of each card is kept; the rest move to Recently Deleted for 7 days & are removed from ${baseSheetName}`, async () => {
+        const removeSet = new Set(toRemove);
+        toRemove.forEach(c => moveCardToRecentlyDeleted('missing', c));
+        missingCards = missingCards.filter(m => !removeSet.has(m));
+        saveAppState();
+        refreshAllViews();
+        await syncChangesToSheetInBackground(`Removed ${toRemove.length} duplicate Missing card entr${toRemove.length === 1 ? 'y' : 'ies'} (moved to Recently Deleted for 7 days).`);
       });
     }
 
