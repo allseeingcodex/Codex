@@ -4632,5 +4632,27 @@ if(nv.length)rec("ADD","Imported Roca CSV","Imported "+nv.length.toLocaleString(
 return r;};
 })();
 </script>
+<script>
+(function(){
+var od=window.adminDeleteMissingByNamePrompt;
+if(typeof od!=="function")return;
+window.adminDeleteMissingByNamePrompt=async function(){
+var self=this,args=arguments,box=document.getElementById("manualMissingName");
+var raw=box?String(box.value||"").trim():"";
+if(!raw)return od.apply(self,args);
+var name=raw;
+try{
+var nk=normalizeCardName(raw);
+var exact=missingCards.some(function(m){return normalizeCardName(m.name)===nk;});
+if(!exact&&typeof window.resolveCardName==="function"){
+var fixed=await window.resolveCardName(raw);
+if(fixed)name=fixed;}
+}catch(e){}
+box.value=name;
+var r=od.apply(self,args);
+box.value="";
+return r;};
+})();
+</script>
 </body>
 </html>
