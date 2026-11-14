@@ -14,7 +14,9 @@
       if (__theme === 'auto') __theme = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
       document.documentElement.classList.toggle('light', __theme === 'light');
       document.documentElement.classList.toggle('dark', __theme !== 'light');
-      window.__bootProf = { visualMode: __p && __p.visualMode ? __p.visualMode : 'arcane' };
+      var __vm = __p && __p.visualMode ? __p.visualMode : 'arcane';
+      if (__vm === 'simple') __vm = 'spreadsheet'; /* old Simple Mode was the spreadsheet look */
+      window.__bootProf = { visualMode: __vm };
       var __start = (__p && __p.startPage) || 'last';
       var __open = __start === 'last' ? localStorage.getItem('codex_active_tab_v1') : __start;
       if (__open && __open !== 'home') {
@@ -152,17 +154,29 @@
     html.light tbody tr:hover { background-color: #dbeafe !important; }
     html.light .located-row-glow { background: #86efac !important; border-left: 5px solid #047857 !important; }
 
-    /* Simple Mode (Spreadsheet Look) Overrides */
-    body.simple-mode * {
+    /* Simple Mode: same layout, calmer look (flat cards, plain font, no glow) */
+    body.mode-clean * {
+      font-family: 'Inter', system-ui, sans-serif !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+    body.mode-clean .font-display, body.mode-clean .tracking-wider { letter-spacing: normal !important; }
+    body.mode-clean .arcane-card {
+      background: var(--bg-card) !important;
+      border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    }
+
+    /* Spreadsheet Mode (grid look) Overrides */
+    body.mode-spreadsheet * {
       font-family: 'Inter', system-ui, sans-serif !important;
       border-radius: 3px !important;
       box-shadow: none !important;
     }
-    body.simple-mode .arcane-card {
+    body.mode-spreadsheet .arcane-card {
       background: var(--bg-card) !important;
       border: 1px solid #64748b !important;
     }
-    body.simple-mode table, body.simple-mode th, body.simple-mode td {
+    body.mode-spreadsheet table, body.mode-spreadsheet th, body.mode-spreadsheet td {
       border: 1px solid rgba(100, 116, 139, 0.45) !important;
       padding-top: 5px !important;
       padding-bottom: 5px !important;
@@ -231,7 +245,7 @@
   </style>
 </head>
 <body class="selection:bg-gold-500 selection:text-obsidian-950">
-  <script>if (window.__bootProf && window.__bootProf.visualMode === 'simple') document.body.classList.add('simple-mode');</script>
+  <script>if (window.__bootProf) { document.body.classList.toggle('mode-clean', window.__bootProf.visualMode === 'clean'); document.body.classList.toggle('mode-spreadsheet', window.__bootProf.visualMode === 'spreadsheet'); }</script>
 
   <!-- Global Announcement Banner (Set by Admin) -->
   <div id="globalAnnouncementBar" class="hidden bg-amber-500/20 border-b border-amber-400/40 px-4 py-1.5 text-center text-xs font-medium text-amber-200">
@@ -354,9 +368,9 @@
         <span data-editable-id="hdr_btn_sheet_sync">Backup/Update</span>
       </button>
       <div class="grid grid-cols-2 gap-1.5">
-        <button onclick="toggleSimpleMode()" id="btnSimpleModeToggle" class="py-2 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-parchment-200 border border-white/15 transition flex items-center justify-center gap-1.5" title="Toggle Spreadsheet Simple Mode">
-          <i class="fa-solid fa-table-cells text-gold-400"></i>
-          <span id="simpleModeBtnLabel">Simple Mode</span>
+        <button onclick="cycleVisualMode()" id="btnSimpleModeToggle" class="py-2 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-parchment-200 border border-white/15 transition flex items-center justify-center gap-1.5" title="Switch view: Complex, Simple or Spreadsheet">
+          <i id="viewModeIcon" class="fa-solid fa-wand-sparkles text-gold-400"></i>
+          <span id="simpleModeBtnLabel">View: Complex</span>
         </button>
         <button onclick="toggleColorTheme()" id="btnThemeToggle" class="py-2 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-gold-300 border border-white/15 flex items-center justify-center gap-1.5 transition" title="Toggle Light / Dark Mode">
           <i id="themeToggleIcon" class="fa-solid fa-sun text-xs"></i>
@@ -1339,8 +1353,9 @@
           <div>
             <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Default Visual Mode</label>
             <select id="profileVisualModeSelect" onchange="updateActiveProfileSetting('visualMode', this.value)" class="w-full px-3 py-1.5 rounded-lg bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
-              <option value="arcane">Arcane Library Mode</option>
-              <option value="simple">Simple Mode (Spreadsheet)</option>
+              <option value="arcane">Complex (Arcane Library)</option>
+              <option value="clean">Simple (clean &amp; flat)</option>
+              <option value="spreadsheet">Spreadsheet (grid)</option>
             </select>
           </div>
           <div>
@@ -1716,7 +1731,7 @@
       {
         id: 'spreadsheet-light',
         name: 'Spreadsheet Mode (Light)',
-        visualMode: 'simple',
+        visualMode: 'spreadsheet',
         colorTheme: 'light',
         defaultTab: 'home',
         missingCols: { status: true, color: true, set: true, price: true, links: true, actions: true },
@@ -1888,6 +1903,7 @@
 
         const sProfiles = localStorage.getItem(STORAGE_KEY_PROFILES);
         userProfiles = sProfiles ? JSON.parse(sProfiles) : JSON.parse(JSON.stringify(DEFAULT_PROFILES));
+        userProfiles.forEach(pr => { pr.visualMode = normalizeVisualMode(pr.visualMode); });
         activeProfileId = localStorage.getItem(STORAGE_KEY_ACTIVE_PROFILE) || 'default-arcane';
 
         const sAccounts = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
@@ -3798,6 +3814,18 @@
       refreshAllViews();
     }
 
+    const VISUAL_MODES = [
+      { id: 'arcane', label: 'Complex', icon: 'fa-wand-sparkles' },
+      { id: 'clean', label: 'Simple', icon: 'fa-square' },
+      { id: 'spreadsheet', label: 'Spreadsheet', icon: 'fa-table-cells' }
+    ];
+
+    // Older saves used 'simple' for what is now the Spreadsheet look.
+    function normalizeVisualMode(v) {
+      if (v === 'simple') return 'spreadsheet';
+      return VISUAL_MODES.some(m => m.id === v) ? v : 'arcane';
+    }
+
     function resolveColorTheme(prof) {
       if (prof.colorTheme === 'auto') {
         return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
@@ -3817,25 +3845,32 @@
     function applyActiveProfileToUI() {
       const prof = getActiveProfile();
       const theme = resolveColorTheme(prof);
-      document.body.classList.toggle('simple-mode', prof.visualMode === 'simple');
+      const vm = normalizeVisualMode(prof.visualMode);
+      document.body.classList.toggle('mode-clean', vm === 'clean');
+      document.body.classList.toggle('mode-spreadsheet', vm === 'spreadsheet');
       document.documentElement.classList.toggle('light', theme === 'light');
       document.documentElement.classList.toggle('dark', theme !== 'light');
 
       const hpName = document.getElementById('headerProfileName');
       if (hpName) hpName.textContent = prof.name;
       const smLabel = document.getElementById('simpleModeBtnLabel');
-      if (smLabel) smLabel.textContent = prof.visualMode === 'simple' ? 'Arcane Mode' : 'Simple Mode';
+      const vmInfo = VISUAL_MODES.find(m => m.id === vm);
+      if (smLabel) smLabel.textContent = 'View: ' + vmInfo.label;
+      const vmIcon = document.getElementById('viewModeIcon');
+      if (vmIcon) vmIcon.className = 'fa-solid ' + vmInfo.icon + ' text-gold-400';
       const thIcon = document.getElementById('themeToggleIcon');
       if (thIcon) thIcon.className = theme === 'light' ? 'fa-solid fa-moon text-xs' : 'fa-solid fa-sun text-xs';
       const thText = document.getElementById('themeToggleTextLabel');
       if (thText) thText.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
     }
 
-    function toggleSimpleMode() {
+    function cycleVisualMode() {
       const prof = getActiveProfile();
-      prof.visualMode = prof.visualMode === 'simple' ? 'arcane' : 'simple';
+      const idx = VISUAL_MODES.findIndex(m => m.id === normalizeVisualMode(prof.visualMode));
+      prof.visualMode = VISUAL_MODES[(idx + 1) % VISUAL_MODES.length].id;
       saveAppState();
       applyActiveProfileToUI();
+      refreshAllViews();
     }
 
     function toggleColorTheme() {
@@ -3849,7 +3884,7 @@
       const sel = document.getElementById('profileSelectDropdown');
       sel.innerHTML = userProfiles.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === activeProfileId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
       const prof = getActiveProfile();
-      document.getElementById('profileVisualModeSelect').value = prof.visualMode;
+      document.getElementById('profileVisualModeSelect').value = normalizeVisualMode(prof.visualMode);
       document.getElementById('profileColorThemeSelect').value = prof.colorTheme || 'dark';
       document.getElementById('profileStartPageSelect').value = prof.startPage || 'last';
       document.getElementById('profileModal').classList.remove('hidden');
