@@ -1228,7 +1228,7 @@
       <div class="space-y-2">
         <label class="block text-xs font-mono uppercase text-gold-300 font-semibold">Sign In to Your Account</label>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input id="authModalSelectAccount" type="email" autocomplete="username" placeholder="Account email" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
+          <input id="authModalSelectAccount" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Email or username" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
           <input id="authModalLoginPassword" type="password" placeholder="Enter Account Password" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
         </div>
         <p id="authLoginErrorMsg" class="hidden text-xs font-semibold text-rose-400"></p>
@@ -3672,7 +3672,7 @@
       if (!nav) return;
       const visibleTrashCount = getVisibleRecentlyDeletedItems().length;
       nav.innerHTML = siteCustomizations.navMenu
-        .filter(item => item.visible !== false && (item.id !== 'admin' || isAdminOrOwner()))
+        .filter(item => item.visible !== false && (((item.id !== 'admin') && (item.id !== 'users')) || isAdminOrOwner()))
         .map(item => {
           const active = item.id === currentActiveTabId;
           const clickAttr = item.type === 'external'
@@ -4343,7 +4343,7 @@ function loadList(){return call("listAccounts",{token:gt()}).then(function(r){if
 function err(m){var e=document.getElementById("authLoginErrorMsg");if(e){e.textContent=m;e.classList.remove("hidden");}else showToast("Sign In",m);}
 function applyList(r,okMsg){if(r&&r.ok&&r.accounts){appAccounts=r.accounts;renderAdminConsole();applyAccountPermissionsToUI();if(okMsg)showToast("Done",okMsg);}else showToast("Not Allowed",(r&&r.error)||"Request failed.");}
 window.codexRestoreSession=function(){window.__codexRes="checking saved login...";var t=gt();if(!t){window.__codexRes="no saved login found";return;}call("session",{token:t}).then(function(r){if(r&&r.ok&&r.account){window.__codexRes="restored";setMe(r.account);}else if(r&&r.ok===false&&!r.error){window.__codexRes="server says session invalid";st("");showToast("Signed Out","Your saved sign-in has expired. Please sign in again.");}else{window.__codexRes="error: "+((r&&r.error)||"no response");showToast("Sign-In Not Restored",(r&&r.error)||"Could not reach the account service. Reload to try again.");}});};
-window.loginSelectedAccountFromModal=function(){var email=(document.getElementById("authModalSelectAccount").value||"").trim();var pw=document.getElementById("authModalLoginPassword").value||"";if(!email||!pw){err("Enter your email and password.");return;}call("login",{email:email,password:pw}).then(function(r){if(r&&r.ok&&r.token){st(r.token);document.getElementById("authModalLoginPassword").value="";closeAuthModal();setMe(r.account);showToast("Signed In","Welcome, "+r.account.name+".");}else err((r&&r.error)||"Sign in failed.");});};
+window.loginSelectedAccountFromModal=function(){var email=(document.getElementById("authModalSelectAccount").value||"").trim();var pw=document.getElementById("authModalLoginPassword").value||"";if(!email||!pw){err("Enter your email or username and password.");return;}call("login",{email:email,password:pw}).then(function(r){if(r&&r.ok&&r.token){st(r.token);document.getElementById("authModalLoginPassword").value="";closeAuthModal();setMe(r.account);showToast("Signed In","Welcome, "+r.account.name+".");}else err((r&&r.error)||"Sign in failed.");});};
 window.signUpNewAccountFromModal=function(){var name=(document.getElementById("authSignUpName").value||"").trim();var email=(document.getElementById("authSignUpEmail").value||"").trim().toLowerCase();var pw=document.getElementById("authSignUpPassword").value||"";if(!email||email.indexOf("@")<0){showToast("Valid Email Required","Please enter a valid email address.");return;}if(pw.length<8){showToast("Password Too Short","Use at least 8 characters.");return;}call("signup",{email:email,name:name,password:pw,avatar:pendingSignUpAvatarDataUrl||""}).then(function(r){if(r&&r.ok&&r.token){pendingSignUpAvatarDataUrl="";st(r.token);document.getElementById("authSignUpPassword").value="";closeAuthModal();setMe(r.account);showToast("Account Created","You are signed in.");}else showToast("Sign Up Failed",(r&&r.error)||"Please try again.");});};
 window.signOutCurrentAccount=function(){var t=gt();st("");if(t)call("logout",{token:t});currentAccountEmail="";appAccounts=[];applyAccountPermissionsToUI();refreshAllViews();renderAdminConsole();closeAuthModal();showToast("Signed Out","You are now in read-only Guest mode. Sign in to add or delete cards.");};
 window.switchActiveAccount=function(){showToast("Not Available","Switching accounts is done by signing in with that account.");};
@@ -4390,5 +4390,6 @@ if(document.readyState==="complete")go();else window.addEventListener("load",go)
 })();
 </script>
 <script>document.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.shiftKey||e.isComposing)return;var id=e.target&&e.target.id;if(id==="authModalLoginPassword"){e.preventDefault();loginSelectedAccountFromModal();}else if(id==="authSignUpName"||id==="authSignUpEmail"||id==="authSignUpPassword"){e.preventDefault();signUpNewAccountFromModal();}},true);</script>
+<script>(function(){var s=window.switchTab;if(typeof s!=="function")return;window.switchTab=function(id){if(id==="users"&&!isAdminOrOwner())return;return s.apply(this,arguments);};})();</script>
 </body>
 </html>
