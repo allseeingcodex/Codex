@@ -175,6 +175,16 @@
       font-family: 'Inter', system-ui, sans-serif !important;
     }
 
+    /* Keep icons (Font Awesome) working in Simple and Spreadsheet modes, which otherwise force one font onto everything */
+    body.mode-clean .fa-solid, body.mode-clean .fas, body.mode-clean .fa-regular, body.mode-clean .far,
+    body.mode-spreadsheet .fa-solid, body.mode-spreadsheet .fas, body.mode-spreadsheet .fa-regular, body.mode-spreadsheet .far {
+      font-family: "Font Awesome 6 Free" !important;
+    }
+    body.mode-clean .fa-brands, body.mode-clean .fab,
+    body.mode-spreadsheet .fa-brands, body.mode-spreadsheet .fab {
+      font-family: "Font Awesome 6 Brands" !important;
+    }
+
     /* Spreadsheet Mode (grid look) Overrides */
     body.mode-spreadsheet * {
       font-family: 'Inter', system-ui, sans-serif !important;
