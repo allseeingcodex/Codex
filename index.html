@@ -1184,97 +1184,100 @@
   <!-- LOGIN / SIGN UP & PROFILE PICTURE / USERNAME MODAL                    -->
   <!-- ===================================================================== -->
   <div id="authModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this) closeAuthModal()">
-    <div class="arcane-card arcane-border-glow rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b border-white/10 pb-3">
-        <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg bg-gold-500/15 border border-gold-400/40 flex items-center justify-center text-gold-400">
-            <i class="fa-solid fa-user-lock"></i>
+    <div class="arcane-card arcane-border-glow rounded-2xl max-w-2xl w-full p-6 sm:p-8 space-y-7 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-gold-500/15 border border-gold-400/40 flex items-center justify-center text-gold-400 text-lg">
+            <i class="fa-solid fa-user"></i>
           </div>
           <div>
-            <h3 class="font-display text-lg font-bold text-parchment-100">Account, Username &amp; Profile Picture</h3>
-            <p class="text-xs text-parchment-300">Customize your username &amp; avatar, switch accounts, or sign up.</p>
+            <h3 class="font-display text-xl font-bold text-parchment-100">My Profile</h3>
+            <p class="text-xs text-parchment-300 mt-0.5">Your username, password and profile picture.</p>
           </div>
         </div>
-        <button onclick="closeAuthModal()" class="w-8 h-8 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-parchment-300 flex items-center justify-center">
+        <button onclick="closeAuthModal()" class="w-9 h-9 shrink-0 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-parchment-300 flex items-center justify-center" title="Close">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <!-- Current Account Username & Avatar Customizer -->
-      <div id="authCurrentProfileSection" class="p-3.5 rounded-xl bg-obsidian-900/90 border border-gold-400/30 space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-mono uppercase text-gold-300 font-semibold">Current Account Profile</span>
-          <div class="flex items-center gap-2">
+      <!-- Current account: picture, username, password -->
+      <div id="authCurrentProfileSection" class="flex flex-col sm:flex-row gap-6 sm:gap-8">
+        <div class="flex flex-col items-center gap-3 sm:w-36 shrink-0">
+          <div id="authModalAvatarPreview" class="w-28 h-28 rounded-full bg-obsidian-800 border-2 border-gold-400/60 flex items-center justify-center overflow-hidden">
+            <i class="fa-solid fa-user text-3xl text-gold-300"></i>
+          </div>
+          <label class="w-full text-center px-3 py-1.5 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 border border-gold-400/40 text-xs font-semibold cursor-pointer transition">
+            <i class="fa-solid fa-camera mr-1"></i>Upload Picture
+            <input type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event, 'current')" />
+          </label>
+          <button onclick="clearCurrentAvatar()" class="text-xs text-parchment-400 hover:text-parchment-200 underline underline-offset-2 transition">Reset picture</button>
+        </div>
+        <div class="flex-1 space-y-4 min-w-0">
+          <div class="flex flex-wrap items-center gap-2.5">
             <span id="authModalCurrentRoleBadge" class="inline-flex items-center"></span>
-            <button id="btnSignOutAccount" onclick="signOutCurrentAccount()" class="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[11px] font-mono font-semibold transition cursor-pointer" title="Sign out to Guest mode">
-              <i class="fa-solid fa-right-from-bracket mr-1"></i>Sign Out
+            <span id="authModalEmailLabel" class="text-xs font-mono text-parchment-400 truncate"></span>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-parchment-300 mb-1.5">Username</label>
+            <input id="authCurrentUsernameInput" type="text" placeholder="Enter your username..." class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm text-parchment-100" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-parchment-300 mb-1.5">New password <span class="font-normal text-parchment-400">(leave blank to keep your current one)</span></label>
+            <input id="authCurrentPasswordInput" type="password" placeholder="New password..." class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-1">
+            <p id="profileSaveNote" class="hidden mr-auto" role="status"></p>
+            <button onclick="saveCurrentAccountProfile()" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 font-bold text-sm transition">
+              Save Profile
             </button>
           </div>
         </div>
-        <div class="flex items-center gap-3.5">
-          <div id="authModalAvatarPreview" class="w-16 h-16 rounded-full bg-obsidian-800 border-2 border-gold-400/60 flex items-center justify-center overflow-hidden shrink-0">
-            <i class="fa-solid fa-user text-xl text-gold-300"></i>
-          </div>
-          <div class="flex-1 space-y-2">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label class="block text-[11px] font-mono text-parchment-400 mb-0.5">Username / Display Name</label>
-                <input id="authCurrentUsernameInput" type="text" placeholder="Enter your username..." class="w-full px-3 py-1.5 rounded-lg bg-obsidian-800 border border-white/15 text-xs font-semibold text-parchment-100" />
-              </div>
-              <div>
-                <label class="block text-[11px] font-mono text-parchment-400 mb-0.5">Change Password (Optional)</label>
-                <input id="authCurrentPasswordInput" type="password" placeholder="New password..." class="w-full px-3 py-1.5 rounded-lg bg-obsidian-800 border border-white/15 text-xs font-mono text-parchment-100" />
-              </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <label class="px-2.5 py-1 rounded-lg bg-gold-500/20 hover:bg-gold-500/30 text-gold-300 border border-gold-400/40 text-xs font-semibold cursor-pointer transition">
-                <i class="fa-solid fa-camera mr-1"></i>Upload Picture
-                <input type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event, 'current')" />
-              </label>
-              <button onclick="clearCurrentAvatar()" class="px-2.5 py-1 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-parchment-300 border border-white/10 text-xs">
-                Reset Picture
-              </button>
-              <button onclick="saveCurrentAccountProfile()" class="ml-auto px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 font-bold text-xs transition">
-                Save Profile
-              </button>
-            </div>
-            <p id="profileSaveNote" class="hidden" role="status"></p>
-          </div>
-        </div>
       </div>
 
-      <!-- Switch Existing Account (Password Required) -->
-      <div class="space-y-2">
-        <label class="block text-xs font-mono uppercase text-gold-300 font-semibold">Sign In to Your Account</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input id="authModalSelectAccount" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Email or username" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
-          <input id="authModalLoginPassword" type="password" placeholder="Enter Account Password" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
-        </div>
-        <p id="authLoginErrorMsg" class="hidden text-xs font-semibold text-rose-400"></p>
-        <button onclick="loginSelectedAccountFromModal()" class="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-gold-500 hover:bg-gold-400 text-obsidian-950 transition">
-          <i class="fa-solid fa-right-to-bracket mr-1"></i>Sign In
+      <!-- Everything about switching accounts, logging out and signing up lives behind this button -->
+      <div class="pt-6 border-t border-white/10">
+        <button id="btnToggleSwitchAccounts" onclick="toggleSwitchAccountsPanel()" aria-expanded="false" aria-controls="switchAccountsPanel" class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-obsidian-900 hover:bg-obsidian-800 border border-white/15 text-sm font-semibold text-parchment-100 transition cursor-pointer">
+          <span class="flex items-center gap-2.5"><i class="fa-solid fa-right-left text-gold-400"></i>Switch accounts/log out</span>
+          <i id="switchAccountsChevron" class="fa-solid fa-chevron-down text-xs text-parchment-400 transition-transform"></i>
         </button>
-      </div>
 
-      <!-- Sign Up New Account with Username, Password & Avatar -->
-      <div class="pt-3 border-t border-white/10 space-y-2.5">
-        <label class="block text-xs font-mono uppercase text-emerald-300 font-semibold">Or Sign Up New Account</label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <input id="authSignUpName" type="text" placeholder="Choose a Username" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs text-parchment-100" />
-          <input id="authSignUpEmail" type="email" placeholder="Email Address" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
-          <input id="authSignUpPassword" type="password" placeholder="Create Password *" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
-          <input id="authSignUpPassword2" type="password" autocomplete="new-password" placeholder="Confirm Password *" class="w-full px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs font-mono text-parchment-100" />
-        </div>
-        <p id="signUpNote" class="hidden" role="status"></p>
-        <div class="flex items-center justify-between gap-2">
-          <label class="px-3 py-1.5 rounded-xl bg-obsidian-900 hover:bg-obsidian-800 text-parchment-200 border border-white/15 text-xs cursor-pointer transition flex items-center gap-1.5">
-            <i class="fa-solid fa-image text-emerald-400"></i>
-            <span id="signUpAvatarStatusLabel">Upload Profile Picture (Optional)</span>
-            <input type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event, 'signup')" />
-          </label>
-          <button onclick="signUpNewAccountFromModal()" class="py-2 px-4 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 transition">
-            <i class="fa-solid fa-user-plus mr-1"></i>Create Account &amp; Sign In
+        <div id="switchAccountsPanel" class="hidden mt-6 space-y-7">
+          <button id="btnSignOutAccount" onclick="signOutCurrentAccount()" class="w-full py-2.5 px-4 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/35 text-sm font-semibold transition cursor-pointer" title="Sign out to Guest mode">
+            <i class="fa-solid fa-right-from-bracket mr-2"></i>Log out
           </button>
+
+          <div class="space-y-3">
+            <h4 class="text-sm font-bold text-parchment-100">Sign in to an account</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input id="authModalSelectAccount" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Email or username" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+              <input id="authModalLoginPassword" type="password" placeholder="Account password" onkeydown="if(event.key==='Enter') loginSelectedAccountFromModal()" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+            </div>
+            <p id="authLoginErrorMsg" class="hidden text-xs font-semibold text-rose-400"></p>
+            <button onclick="loginSelectedAccountFromModal()" class="w-full py-2.5 px-4 rounded-xl text-sm font-semibold bg-gold-500 hover:bg-gold-400 text-obsidian-950 transition">
+              <i class="fa-solid fa-right-to-bracket mr-1.5"></i>Sign In
+            </button>
+          </div>
+
+          <div class="pt-6 border-t border-white/10 space-y-3">
+            <h4 class="text-sm font-bold text-parchment-100">Create a new account</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input id="authSignUpName" type="text" placeholder="Choose a username" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm text-parchment-100" />
+              <input id="authSignUpEmail" type="email" placeholder="Email address" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+              <input id="authSignUpPassword" type="password" placeholder="Create password *" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+              <input id="authSignUpPassword2" type="password" autocomplete="new-password" placeholder="Confirm password *" class="w-full px-4 py-2.5 rounded-xl bg-obsidian-900 border border-white/15 text-sm font-mono text-parchment-100" />
+            </div>
+            <p id="signUpNote" class="hidden" role="status"></p>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <label class="px-3 py-2 rounded-xl bg-obsidian-900 hover:bg-obsidian-800 text-parchment-200 border border-white/15 text-xs cursor-pointer transition flex items-center gap-1.5">
+                <i class="fa-solid fa-image text-emerald-400"></i>
+                <span id="signUpAvatarStatusLabel">Upload profile picture (optional)</span>
+                <input type="file" accept="image/*" class="hidden" onchange="handleAvatarUpload(event, 'signup')" />
+              </label>
+              <button onclick="signUpNewAccountFromModal()" class="py-2.5 px-5 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 transition">
+                <i class="fa-solid fa-user-plus mr-1.5"></i>Create Account &amp; Sign In
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -3919,8 +3922,24 @@
       switchProfile(id);
     }
 
+    function toggleSwitchAccountsPanel(force) {
+      const panel = document.getElementById('switchAccountsPanel');
+      if (!panel) return;
+      const open = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', !open);
+      const btn = document.getElementById('btnToggleSwitchAccounts');
+      if (btn) btn.setAttribute('aria-expanded', String(open));
+      const chev = document.getElementById('switchAccountsChevron');
+      if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+      if (open) setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    }
+
     function openAuthModal() {
       const acc = getCurrentAccount();
+      // Guests need the sign in / sign up forms, so show them; signed-in users get the clean profile first.
+      toggleSwitchAccountsPanel(!acc);
+      const emailLbl = document.getElementById('authModalEmailLabel');
+      if (emailLbl) emailLbl.textContent = acc ? acc.email : 'Not signed in';
       const sel = document.getElementById('authModalSelectAccount');
       sel.innerHTML = appAccounts.map(u => `<option value="${escapeHtml(u.email)}" ${u.email.toLowerCase() === currentAccountEmail.toLowerCase() ? 'selected' : ''}>${escapeHtml(u.name)} (${escapeHtml(u.email)}) [${u.role.toUpperCase()}]</option>`).join('');
       const profSec = document.getElementById('authCurrentProfileSection');
