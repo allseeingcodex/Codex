@@ -2011,8 +2011,10 @@
 
         const sPrices = localStorage.getItem(STORAGE_KEY_PRICES);
         priceCache = sPrices ? JSON.parse(sPrices) : {};
+        // drop the foil/etched name-level slots from the previous release (they could hold stale non-foil prices)
+        Object.keys(priceCache).forEach(k => { if (k.includes('|foil') || k.includes('|etched')) delete priceCache[k]; });
         vaultCards.forEach(c => {
-          if (c.price != null) priceCache[priceCacheKey(c.name, c.printing)] = c.price;
+          if (c.price != null && !c.priceSrc && !isFoilPrinting(c.printing)) priceCache[normalizeCardName(c.name)] = c.price;
         });
 
         const sProfiles = localStorage.getItem(STORAGE_KEY_PROFILES);
@@ -2465,41 +2467,53 @@
       return { missingMap, vaultByNormName };
     }
 
-    // Foil copies use the foil price. Cache keys: "name" (normal), "name|foil", "name|etched".
+    // ---- Price helpers ----
+    // Batch cards are priced by their exact printing (set + collector # + finish); Missing Cards by their oldest printing.
+    // card.priceSrc: 'exact' | 'approx' (price borrowed from another printing, shown with *) | 'none' (blank).
+    // Cards that have not been through the new "Fetch Prices" yet have no priceSrc and use the old name-based cache.
     function isFoilPrinting(printing) { return /foil|etched/i.test(String(printing || '')); }
+    function finishOf(printing) {
+      const p = String(printing || '');
+      return /etched/i.test(p) ? 'etched' : (/foil/i.test(p) ? 'foil' : 'normal');
+    }
     function foilIconHtml(printing) {
       if (!isFoilPrinting(printing)) return '';
       const label = /etched/i.test(String(printing)) ? 'Etched foil' : 'Foil';
       return `<span class="foil-icon" role="img" aria-label="${label}" title="${label}"></span>`;
     }
-    function priceCacheKey(cardName, printing) {
-      const norm = normalizeCardName(cardName);
-      if (!isFoilPrinting(printing)) return norm;
-      return norm + (/etched/i.test(String(printing)) ? '|etched' : '|foil');
-    }
-    function cachedPriceFor(cardName, printing) {
-      const key = priceCacheKey(cardName, printing);
-      let v = priceCache[key];
-      if (v == null && key.endsWith('|etched')) v = priceCache[normalizeCardName(cardName) + '|foil'];
-      return v != null ? Number(v) : null;
-    }
-    // Saves Scryfall's foil / etched prices (TCGplayer market) next to the normal price.
-    // Writes a price under the full card name and, for double-faced cards ("A // B"), under the front face too,
-    // since that is the name the collection usually holds.
+    // Old name-level cache (one price per card name), only used until a card gets an exact-printing price.
     function setCachedPrice(cardName, suffix, value) {
       const norm = normalizeCardName(cardName);
       priceCache[norm + suffix] = value;
       if (norm.includes(' // ')) priceCache[norm.split(' // ')[0].trim() + suffix] = value;
     }
-    function storeFoilPrices(card, cardName) {
-      const name = cardName || card.name;
-      const foil = card.prices?.usd_foil, etched = card.prices?.usd_etched;
-      if (foil) setCachedPrice(name, '|foil', parseFloat(foil));
-      if (etched) setCachedPrice(name, '|etched', parseFloat(etched));
+    function cachedPriceFor(cardName, printing) {
+      if (isFoilPrinting(printing)) return null; // a name-level price can't be a foil price
+      const v = priceCache[normalizeCardName(cardName)];
+      return v != null ? Number(v) : null;
     }
     function getCardPrice(cardName, explicitPrice, printing) {
       if (explicitPrice != null && !isNaN(explicitPrice)) return Number(explicitPrice);
       return cachedPriceFor(cardName, printing);
+    }
+    // The price to show for a card record (batch or missing). Cards checked by the new fetch may be intentionally blank.
+    function effectiveCardPrice(card) {
+      if (card.priceSrc) return card.price != null ? Number(card.price) : null;
+      return getCardPrice(card.name, card.price, card.printing);
+    }
+    function priceStarHtml(card) {
+      if (!(card && (card.priceSrc === 'approx' || card.priceApprox))) return '';
+      return '<span class="text-amber-300 font-bold" title="Estimate: this exact printing has no price listed on Scryfall, so this is the cheapest price listed for another printing of the card.">*</span>';
+    }
+    function vaultRecordKey(c) { return String(c.batch) + '|' + String(c.seq) + '|' + String(c.name).toLowerCase(); }
+    // When cards are reloaded from the account server / Sheet (which don't store prices), keep the prices we already had.
+    function carryPriceFields(newCards, oldCards, keyFn) {
+      const old = new Map();
+      (oldCards || []).forEach(c => { if (c && c.priceSrc) old.set(keyFn(c), c); });
+      (newCards || []).forEach(c => {
+        const o = old.get(keyFn(c));
+        if (o) { c.price = o.price; c.priceSrc = o.priceSrc; }
+      });
     }
 
     function refreshAllViews() {
@@ -2681,7 +2695,7 @@
           ...m,
           hits,
           isLocated: hits.length > 0,
-          effectivePrice: getCardPrice(m.name, m.price)
+          effectivePrice: effectiveCardPrice(m)
         };
       }).filter(m => {
         if (cFilter !== 'ALL' && m.color !== cFilter) return false;
@@ -2720,7 +2734,7 @@
           : `<span class="text-xs font-mono text-parchment-400">Missing</span>`;
 
         const priceHtml = m.effectivePrice != null
-          ? `<span class="text-emerald-400 font-mono font-semibold">$${m.effectivePrice.toFixed(2)}</span>`
+          ? `<span class="text-emerald-400 font-mono font-semibold">$${m.effectivePrice.toFixed(2)}</span>${priceStarHtml(m)}`
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
@@ -2796,7 +2810,7 @@
           _idx: idx,
           batchNum: bNum,
           isMatch,
-          effectivePrice: getCardPrice(c.name, c.price, c.printing)
+          effectivePrice: effectiveCardPrice(c)
         };
       }).filter(c => {
         if (!visibleBatchNumbers.has(c.batchNum)) return false;
@@ -2846,7 +2860,7 @@
 
       tbody.innerHTML = pageRows.map(c => {
         const priceHtml = c.effectivePrice != null
-          ? `<span class="text-emerald-400 font-mono font-semibold">$${c.effectivePrice.toFixed(2)}</span>`
+          ? `<span class="text-emerald-400 font-mono font-semibold">$${c.effectivePrice.toFixed(2)}</span>${priceStarHtml(c)}`
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
@@ -3196,7 +3210,8 @@
             set: c.set || '—',
             meta: `${c.rarity || 'Common'} • ${c.condition || 'NM'}`,
             printing: c.printing || '',
-            price: getCardPrice(c.name, c.price, c.printing),
+            price: effectiveCardPrice(c),
+            priceApprox: c.priceSrc === 'approx',
             tcgId: c.tcgId || ''
           });
         });
@@ -3215,7 +3230,8 @@
             isStaple: isStapleCard(m.name),
             set: m.set || '—',
             meta: `Color: ${m.color || 'C'}`,
-            price: getCardPrice(m.name, m.price),
+            price: effectiveCardPrice(m),
+            priceApprox: m.priceSrc === 'approx',
             tcgId: ''
           });
         });
@@ -3278,7 +3294,7 @@
           : `<span class="font-mono text-xs text-parchment-200">${escapeHtml(item.location)}</span>`;
 
         const priceHtml = item.price != null
-          ? `<span class="text-emerald-400 font-mono font-semibold">$${Number(item.price).toFixed(2)}</span>`
+          ? `<span class="text-emerald-400 font-mono font-semibold">$${Number(item.price).toFixed(2)}</span>${priceStarHtml(item)}`
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
@@ -3308,106 +3324,274 @@
     // =======================================================================
     // 5. FETCH ALL PRICES WITH SPINNING LOADING MODAL
     // =======================================================================
-    // Second pass: cards Scryfall had no price for (common with old sets like Fallen Empires, where the default
-    // printing has no listing) borrow the cheapest price listed on any other printing, near mint or not.
-    let lastPriceFallbackCount = 0;
-    async function fetchPrintingPricesFor(name) {
-      const q = encodeURIComponent('!"' + name + '" include:extras');
-      let cards = [];
-      try {
-        const res = await fetch(`https://api.scryfall.com/cards/search?q=${q}&unique=prints`);
-        if (res.ok) {
-          cards = (await res.json()).data || [];
-        } else if (res.status === 404) {
-          const r2 = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
-          if (r2.ok) cards = [await r2.json()];
-        }
-      } catch (e) { console.warn('Printing price lookup failed for', name, e); }
-      return cards;
-    }
-    async function fillMissingPricesFromOtherPrintings(onProgress) {
-      const need = new Map(); // normalized name -> clean name
-      const add = (n, printing) => {
-        if (cachedPriceFor(n, printing) == null) need.set(normalizeCardName(n), String(n).replace(/\s*\([^)]*\)\s*$/g, '').trim());
-      };
-      missingCards.forEach(m => add(m.name));
-      vaultCards.forEach(v => add(v.name, v.printing));
-      const names = Array.from(need.values()).filter(Boolean);
-      lastPriceFallbackCount = 0;
-      const minOf = (cards, field) => {
-        const vals = cards.map(c => parseFloat(c.prices?.[field])).filter(n => Number.isFinite(n) && n > 0);
-        return vals.length ? Math.min(...vals) : null;
-      };
-      for (let i = 0; i < names.length; i++) {
-        if (typeof onProgress === 'function') onProgress(i + 1, names.length);
-        const cards = await fetchPrintingPricesFor(names[i]);
-        if (cards.length) {
-          const usd = minOf(cards, 'usd'), foil = minOf(cards, 'usd_foil'), etched = minOf(cards, 'usd_etched');
-          const any = usd ?? foil ?? etched;
-          let found = false;
-          if (priceCache[normalizeCardName(names[i])] == null && any != null) { setCachedPrice(names[i], '', any); found = true; }
-          if (foil != null && priceCache[normalizeCardName(names[i]) + '|foil'] == null) { setCachedPrice(names[i], '|foil', foil); found = true; }
-          if (etched != null && priceCache[normalizeCardName(names[i]) + '|etched'] == null) { setCachedPrice(names[i], '|etched', etched); found = true; }
-          if (found) lastPriceFallbackCount++;
-        }
-        await new Promise(r => setTimeout(r, 110));
-      }
+    // =======================================================================
+    // EXACT-PRINTING PRICE ENGINE
+    //  - Batches: the exact printing listed in the Roca batch (set + collector # + finish).
+    //  - Missing list: the oldest printing of the card.
+    //  - No price listed for that printing: the cheapest price of another printing, flagged with *.
+    //  - Nothing listed anywhere: left blank.
+    // Prices are Scryfall's copy of TCGplayer's market price (usd / usd_foil / usd_etched).
+    // =======================================================================
+    const SCRYFALL_API = 'https://api.scryfall.com';
+    const STORAGE_KEY_SET_CODES = 'codex_scryfall_sets_v1';
+    const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+    const priceNum = v => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+    const cleanCardName = n => String(n || '').replace(/\s*\([^)]*\)\s*$/g, '').trim();
+    const cnNorm = x => String(x == null ? '' : x).trim().toLowerCase().replace(/^0+(?=\d)/, '');
+    function sameCardName(requested, scryName) {
+      const a = standardKey(requested), b = standardKey(scryName);
+      if (a === b) return true;
+      const af = a.split(' // ')[0].trim(), bf = b.split(' // ')[0].trim();
+      return a === bf || af === b;
     }
 
-    async function batchFetchScryfallPricesByNames(cardNames, onProgress, onFallbackProgress) {
-      const uniqueNames = Array.from(new Set(cardNames.map(n => String(n).replace(/\s*\([^)]*\)\s*$/g, '').trim()).filter(Boolean)));
-      if (uniqueNames.length === 0) return 0;
-
-      let updatedCount = 0;
-      const total = uniqueNames.length;
-
-      for (let i = 0; i < total; i += 75) {
-        const chunk = uniqueNames.slice(i, i + 75);
-        const processed = Math.min(total, i + chunk.length);
-        if (typeof onProgress === 'function') {
-          onProgress(processed, total, Math.floor(i / 75) + 1, Math.ceil(total / 75));
-        }
-
-        const identifiers = chunk.map(name => ({ name }));
+    // fetch with retries for rate limits / hiccups; returns null if Scryfall can't be reached
+    async function scryFetch(url, opts) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const res = await fetch('https://api.scryfall.com/cards/collection', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identifiers })
+          const res = await fetch(url, opts);
+          if (res.status === 429 || res.status >= 500) { await sleepMs(1200 * (attempt + 1)); continue; }
+          return res;
+        } catch (e) { await sleepMs(800 * (attempt + 1)); }
+      }
+      return null;
+    }
+
+    // ---- set name -> Scryfall set code (Roca/TCGplayer set names differ slightly from Scryfall's) ----
+    let scryfallSets = null;
+    function normSetName(sn) {
+      return String(sn || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/&/g, ' and ').replace(/[‘’'`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    }
+    async function ensureScryfallSets() {
+      if (scryfallSets) return scryfallSets;
+      let list = null;
+      try {
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY_SET_CODES) || 'null');
+        if (raw && raw.ts && (Date.now() - raw.ts) < 30 * 24 * 3600 * 1000 && Array.isArray(raw.sets) && raw.sets.length > 100) list = raw.sets;
+      } catch (e) {}
+      if (!list) {
+        const res = await scryFetch(SCRYFALL_API + '/sets');
+        if (!res || !res.ok) throw new Error('Could not load the Scryfall set list');
+        list = ((await res.json()).data || []).map(x => [x.code, x.name]);
+        try { localStorage.setItem(STORAGE_KEY_SET_CODES, JSON.stringify({ ts: Date.now(), sets: list })); } catch (e) {}
+      }
+      const entries = list.map(([code, name]) => {
+        const norm = normSetName(name);
+        return { code, norm, tokens: new Set(norm.split(' ').filter(Boolean)) };
+      });
+      scryfallSets = { codes: new Set(list.map(x => x[0])), entries, memo: new Map() };
+      return scryfallSets;
+    }
+    function resolveSetCode(setName) {
+      const S = scryfallSets;
+      const raw = String(setName || '').trim();
+      if (!S || !raw) return null;
+      if (S.memo.has(raw)) return S.memo.get(raw);
+      let code = null;
+      const paren = raw.match(/\(([A-Za-z0-9]{2,6})\)\s*$/);               // "Magic 2013 (M13)"
+      if (paren && S.codes.has(paren[1].toLowerCase())) code = paren[1].toLowerCase();
+      if (!code && /^[A-Za-z0-9]{2,6}$/.test(raw) && S.codes.has(raw.toLowerCase())) code = raw.toLowerCase(); // already a code
+      if (!code) {
+        const n = normSetName(raw);
+        const exact = n ? S.entries.find(e => e.norm === n) : null;
+        if (exact) {
+          code = exact.code;
+        } else if (n) {
+          const toks = new Set(n.split(' ').filter(Boolean));
+          let best = null, bestScore = 0;
+          S.entries.forEach(e => {
+            let inter = 0;
+            toks.forEach(t => { if (e.tokens.has(t)) inter++; });
+            const union = toks.size + e.tokens.size - inter;
+            const jac = union ? inter / union : 0;
+            const small = Math.min(toks.size, e.tokens.size);
+            const subset = small >= 2 && inter === small;
+            const score = jac + (subset ? 0.25 : 0);
+            if ((jac >= 0.6 || (subset && jac >= 0.4)) && score > bestScore) { best = e; bestScore = score; }
           });
-          if (res.ok) {
-            const data = await res.json();
-            (data.data || []).forEach(card => {
-              const p = card.prices?.usd || card.prices?.usd_foil;
-              storeFoilPrices(card, card.name);
-              if (p) {
-                setCachedPrice(card.name, '', parseFloat(p));
-                updatedCount++;
-              }
-            });
-          }
-        } catch (err) {
-          console.warn('Scryfall batch fetch error:', err);
+          if (best) code = best.code;
         }
-        await new Promise(r => setTimeout(r, 110));
+      }
+      S.memo.set(raw, code);
+      return code;
+    }
+
+    // ---- reading prices off a Scryfall printing ----
+    function printingPriceFor(sc, finish) {
+      const p = sc.prices || {};
+      if (finish === 'foil') return priceNum(p.usd_foil);
+      if (finish === 'etched') return priceNum(p.usd_etched);
+      const n = priceNum(p.usd);
+      if (n != null) return n;
+      return (sc.finishes || []).includes('nonfoil') ? null : priceNum(p.usd_foil); // foil-only printing
+    }
+    function cheapestAcrossPrintings(list, finish) {
+      const vals = field => list.map(c => priceNum(c.prices && c.prices[field])).filter(v => v != null);
+      let v;
+      if (finish === 'foil') v = vals('usd_foil');
+      else if (finish === 'etched') { v = vals('usd_etched'); if (!v.length) v = vals('usd_foil'); }
+      else { v = vals('usd'); if (!v.length) v = vals('usd_foil'); if (!v.length) v = vals('usd_etched'); }
+      return v.length ? Math.min(...v) : null;
+    }
+
+    // ---- exact printing lookups for batch cards (75 per request) ----
+    async function lookupExactPrintings(cards, onProgress) {
+      const lookups = new Map();   // lk -> { id, meta }
+      const recLk = new Map();     // card -> lk | null (set not recognised)
+      cards.forEach(c => {
+        const code = resolveSetCode(c.set);
+        if (!code) { recLk.set(c, null); return; }
+        const clean = cleanCardName(c.name);
+        const num = String(c.number == null ? '' : c.number).trim();
+        const lk = code + '|' + (num ? cnNorm(num) : 'n:' + standardKey(clean));
+        recLk.set(c, lk);
+        if (!lookups.has(lk)) lookups.set(lk, { id: num ? { set: code, collector_number: num } : { name: clean, set: code }, meta: { name: clean, set: code } });
+      });
+      const found = new Map(), failed = new Set();
+      const runStage = async (items) => {
+        for (let i = 0; i < items.length; i += 75) {
+          const chunk = items.slice(i, i + 75);
+          if (typeof onProgress === 'function') onProgress(Math.min(i + 75, items.length), items.length);
+          const res = await scryFetch(SCRYFALL_API + '/cards/collection', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identifiers: chunk.map(x => x.id) })
+          });
+          if (!res || !res.ok) { chunk.forEach(x => failed.add(x.lk)); await sleepMs(110); continue; }
+          const data = await res.json();
+          const byCn = new Map(), byName = new Map();
+          (data.data || []).forEach(sc => {
+            byCn.set(sc.set + '|' + cnNorm(sc.collector_number), sc);
+            const k = standardKey(sc.name);
+            byName.set(sc.set + '|n:' + k, sc);
+            byName.set(sc.set + '|n:' + k.split(' // ')[0].trim(), sc);
+          });
+          chunk.forEach(x => {
+            const sc = x.id.collector_number != null
+              ? byCn.get(x.id.set + '|' + cnNorm(x.id.collector_number))
+              : byName.get(x.id.set + '|n:' + standardKey(x.id.name));
+            if (sc && sameCardName(x.meta.name, sc.name)) found.set(x.lk, sc); // wrong card at that number = not found
+          });
+          await sleepMs(110);
+        }
+      };
+      const stage1 = Array.from(lookups.entries()).map(([lk, v]) => ({ lk, id: v.id, meta: v.meta }));
+      await runStage(stage1);
+      // collector number didn't match: try again by name + set
+      const stage2 = stage1.filter(x => !found.has(x.lk) && !failed.has(x.lk) && x.id.collector_number != null)
+        .map(x => ({ lk: x.lk, id: { name: x.meta.name, set: x.id.set }, meta: x.meta }));
+      if (stage2.length) await runStage(stage2);
+      return { found, failed, recLk };
+    }
+
+    // ---- all printings of a card (oldest first), several names per search ----
+    async function fetchPrintingsForNames(names, onProgress) {
+      const out = new Map();       // standardKey(name) -> [printings, oldest first]
+      const failed = new Set();
+      const addCard = sc => {
+        const k = standardKey(sc.name);
+        new Set([k, k.split(' // ')[0].trim()]).forEach(kk => {
+          if (!out.has(kk)) out.set(kk, []);
+          out.get(kk).push(sc);
+        });
+      };
+      const CHUNK = 4;
+      for (let i = 0; i < names.length; i += CHUNK) {
+        const chunk = names.slice(i, i + CHUNK);
+        if (typeof onProgress === 'function') onProgress(Math.min(i + CHUNK, names.length), names.length);
+        const q = '(' + chunk.map(n => '!"' + String(n).replace(/[‘’]/g, "'").replace(/"/g, '') + '"').join(' or ') + ') include:extras';
+        let url = SCRYFALL_API + '/cards/search?q=' + encodeURIComponent(q) + '&unique=prints&order=released&dir=asc';
+        let pages = 0, unreachable = false;
+        while (url && pages < 12) {
+          const res = await scryFetch(url);
+          if (!res) { unreachable = true; break; }
+          if (!res.ok) break; // 404 = nothing matched
+          const j = await res.json();
+          (j.data || []).forEach(addCard);
+          url = j.has_more ? j.next_page : null;
+          pages++;
+          await sleepMs(110);
+        }
+        if (unreachable) chunk.forEach(n => failed.add(standardKey(n)));
+        await sleepMs(110);
+      }
+      // names with no printings at all: one fuzzy try (typos / odd spellings)
+      for (const n of names) {
+        const k = standardKey(n);
+        if (out.has(k) || failed.has(k)) continue;
+        const res = await scryFetch(SCRYFALL_API + '/cards/named?fuzzy=' + encodeURIComponent(n));
+        if (!res) failed.add(k);
+        else if (res.ok) out.set(k, [await res.json()]);
+        await sleepMs(110);
+      }
+      return { out, failed };
+    }
+
+    // Returns { exact, approx, blank, skipped }. onPhase(label, done, total) drives the loading card.
+    async function refreshAllPrices(onPhase) {
+      const stats = { exact: 0, approx: 0, blank: 0, skipped: 0 };
+      const setPrice = (rec, price, src) => { rec.price = price; rec.priceSrc = src; };
+
+      onPhase('Matching set names', 0, 1);
+      await ensureScryfallSets();
+
+      // 1) exact printing for every batch card
+      let exact = { found: new Map(), failed: new Set(), recLk: new Map() };
+      if (vaultCards.length) {
+        exact = await lookupExactPrintings(vaultCards, (d, t) => onPhase('Looking up the exact printing of each batch card', d, t));
       }
 
-      await fillMissingPricesFromOtherPrintings(onFallbackProgress);
-      updatedCount += lastPriceFallbackCount;
-
-      missingCards.forEach(m => {
-        const p = priceCache[normalizeCardName(m.name)];
-        if (p != null) m.price = p;
-      });
+      // 2) work out which cards still need the list of all printings
+      const need = new Map();
+      const addNeed = n => { const c = cleanCardName(n); need.set(standardKey(c), c); };
+      missingCards.forEach(m => addNeed(m.name));
+      const plan = [];
       vaultCards.forEach(v => {
-        // a foil copy with no foil price anywhere falls back to the regular price rather than none
-        const p = cachedPriceFor(v.name, v.printing) ?? (isFoilPrinting(v.printing) ? (priceCache[normalizeCardName(v.name)] ?? null) : null);
-        if (p != null) v.price = p;
+        const lk = exact.recLk.get(v);
+        if (lk && exact.failed.has(lk)) { stats.skipped++; return; }
+        const sc = lk ? exact.found.get(lk) : null;
+        if (sc) {
+          const p = printingPriceFor(sc, finishOf(v.printing));
+          if (p != null) { plan.push({ rec: v, price: p }); return; }
+        }
+        addNeed(v.name);
+        plan.push({ rec: v, fallback: true });
+      });
+
+      const { out: printings, failed: pFailed } = await fetchPrintingsForNames(
+        Array.from(need.values()),
+        (d, t) => onPhase('Checking other printings and the oldest printing of missing cards', d, t)
+      );
+
+      // 3) batch cards
+      plan.forEach(item => {
+        if (!item.fallback) { setPrice(item.rec, item.price, 'exact'); stats.exact++; return; }
+        const k = standardKey(cleanCardName(item.rec.name));
+        if (pFailed.has(k)) { stats.skipped++; return; }
+        const list = printings.get(k) || [];
+        const p = list.length ? cheapestAcrossPrintings(list, finishOf(item.rec.printing)) : null;
+        if (p != null) { setPrice(item.rec, p, 'approx'); stats.approx++; }
+        else { setPrice(item.rec, null, 'none'); stats.blank++; }
+      });
+
+      // 4) missing list: oldest printing
+      missingCards.forEach(m => {
+        const k = standardKey(cleanCardName(m.name));
+        if (pFailed.has(k)) { stats.skipped++; return; }
+        const list = printings.get(k) || [];
+        if (!list.length) { setPrice(m, null, 'none'); stats.blank++; return; }
+        const oldest = printingPriceFor(list[0], 'normal');
+        if (oldest != null) { setPrice(m, oldest, 'exact'); stats.exact++; }
+        else {
+          const p = cheapestAcrossPrintings(list, 'normal');
+          if (p != null) { setPrice(m, p, 'approx'); stats.approx++; }
+          else { setPrice(m, null, 'none'); stats.blank++; }
+        }
+        if (m.price != null) setCachedPrice(m.name, '', m.price);
       });
 
       saveAppState();
       refreshAllViews();
-      return updatedCount;
+      return stats;
     }
 
     async function fetchAllPricesEverywhere() {
@@ -3416,29 +3600,31 @@
       const counter = document.getElementById('priceLoadingCounter');
       const batchStatus = document.getElementById('priceLoadingBatchStatus');
 
-      const allNames = [
-        ...missingCards.map(m => m.name),
-        ...vaultCards.map(c => c.name)
-      ];
-
       if (modal) {
         modal.classList.remove('hidden');
-        if (bar) bar.style.width = '5%';
+        if (bar) bar.style.width = '3%';
       }
 
-      const count = await batchFetchScryfallPricesByNames(allNames, (done, total, chunkIdx, totalChunks) => {
-        if (counter) counter.textContent = `${done} / ${total} unique cards`;
-        if (batchStatus) batchStatus.textContent = `Fetching Scryfall batch ${chunkIdx} of ${totalChunks}...`;
-        if (bar) bar.style.width = `${Math.round((done / Math.max(1, total)) * 100)}%`;
-      }, (done, total) => {
-        if (counter) counter.textContent = `${done} / ${total} cards without a price`;
-        if (batchStatus) batchStatus.textContent = 'Checking other printings for cards with no listed price...';
-        if (bar) bar.style.width = `${Math.round((done / Math.max(1, total)) * 100)}%`;
-      });
+      let stats;
+      try {
+        stats = await refreshAllPrices((label, done, total) => {
+          if (batchStatus) batchStatus.textContent = label + '...';
+          if (counter) counter.textContent = `${done.toLocaleString()} / ${total.toLocaleString()}`;
+          if (bar) bar.style.width = `${Math.max(3, Math.round((done / Math.max(1, total)) * 100))}%`;
+        });
+      } catch (err) {
+        console.warn('Price update failed:', err);
+        if (modal) modal.classList.add('hidden');
+        showToast('Price update failed', 'Could not reach Scryfall. Your existing prices were not changed. Try again in a moment.');
+        return;
+      }
 
       if (modal) modal.classList.add('hidden');
-      const extra = lastPriceFallbackCount > 0 ? ` (${lastPriceFallbackCount.toLocaleString()} priced from another printing)` : '';
-      showToast('All Prices Synced', `Updated TCGplayer prices for ${count.toLocaleString()} cards${extra}.`);
+      const bits = [`${stats.exact.toLocaleString()} priced from their exact printing`];
+      if (stats.approx) bits.push(`${stats.approx.toLocaleString()} marked * (price from another printing)`);
+      if (stats.blank) bits.push(`${stats.blank.toLocaleString()} have no price listed`);
+      if (stats.skipped) bits.push(`${stats.skipped.toLocaleString()} skipped (Scryfall didn't answer, run again)`);
+      showToast('Prices Updated', bits.join(' • ') + '.');
     }
 
     // =======================================================================
@@ -4083,7 +4269,6 @@
 
             const p = card.prices?.usd || card.prices?.usd_foil;
             if (p) priceCache[normalizeCardName(clean)] = parseFloat(p);
-            storeFoilPrices(card, clean);
             return {
               name: card.name || clean,
               set: (card.set || '—').toUpperCase(),
@@ -4753,6 +4938,7 @@
               setBaseSheetName(String(data.sheetName).trim(), false);
             }
             if (Array.isArray(data.missingCards) && data.missingCards.length > 0) {
+              const oldMissingForPrices = missingCards;
               missingCards = data.missingCards
                 .filter(m => !deletedMissingNames.has(normalizeCardName(m.name)))
                 .map((m, i) => ({
@@ -4762,12 +4948,15 @@
                   set: m.set || '—',
                   price: priceCache[normalizeCardName(m.name)] ?? null
                 }));
+              carryPriceFields(missingCards, oldMissingForPrices, m => String(m.name).toLowerCase());
             }
             if (Array.isArray(data.vaultCards) && data.vaultCards.length > 0) {
+              const oldVaultForPrices = vaultCards;
               vaultCards = data.vaultCards.map(v => ({
                 ...v,
                 price: cachedPriceFor(v.name, v.printing)
               }));
+              carryPriceFields(vaultCards, oldVaultForPrices, vaultRecordKey);
               vaultCards.forEach(c => visibleBatchNumbers.add(c.batchNum || extractBatchNumber(c.batch)));
             }
             updateLastSyncedUI(new Date().toISOString());
@@ -5029,7 +5218,6 @@
           const usd = card.prices?.usd || card.prices?.usd_foil || null;
           if (usd) {
             priceCache[normalizeCardName(clean)] = parseFloat(usd);
-            storeFoilPrices(card, clean);
             saveAppState();
           }
           content.innerHTML = `
@@ -5168,7 +5356,7 @@ function pc(n,pr){try{var x=cachedPriceFor(n,pr);return x===undefined?null:x;}ca
 function toCard(a){return {name:a[2],number:a[3],condition:a[4],printing:a[5],rarity:a[6],qty:Number(a[7])||1,seq:isNaN(Number(a[1]))?a[1]:Number(a[1]),batch:a[0],batchNum:extractBatchNumber(a[0]),set:a[8],tcgId:a[9],price:pc(a[2],a[5])};}
 function toArr(c){return [String(c.batch),String(c.seq),String(c.name),String(c.number||""),String(c.condition||"Near Mint"),String(c.printing||"Normal"),String(c.rarity||"Common"),Number(c.qty)||1,String(c.set||""),String(c.tcgId||"")];}
 function mArr(m){return [String(m.name),String(m.color||"C"),(m.set&&m.set!=="\u2014")?String(m.set):""];}
-function applyData(d){vaultCards=d.cards.map(toCard);missingCards=d.missing.map(function(m,i){return {id:"m-"+(i+1),name:m[0],color:m[1]||"C",set:m[2]||"\u2014",price:pc(m[0])};});lastSig=sig(d);srvV=new Set(vaultCards.map(vKey));srvM=new Set(missingCards.map(function(m){return m.name.toLowerCase();}));loaded=true;vaultCards.forEach(function(c){visibleBatchNumbers.add(c.batchNum);});origSave();refreshAllViews();}
+function applyData(d){var oldV=vaultCards,oldM=missingCards;vaultCards=d.cards.map(toCard);missingCards=d.missing.map(function(m,i){return {id:"m-"+(i+1),name:m[0],color:m[1]||"C",set:m[2]||"\u2014",price:pc(m[0])};});carryPriceFields(vaultCards,oldV,vaultRecordKey);carryPriceFields(missingCards,oldM,function(m){return String(m.name).toLowerCase();});lastSig=sig(d);srvV=new Set(vaultCards.map(vKey));srvM=new Set(missingCards.map(function(m){return m.name.toLowerCase();}));loaded=true;vaultCards.forEach(function(c){visibleBatchNumbers.add(c.batchNum);});origSave();refreshAllViews();}
 function loadServer(){return post("cardsGet").then(function(d){if(d&&d.ok&&d.cards&&d.cards.length>0){applyData(d);return true;}return false;});}
 function revert(msg){loadServer().then(function(){if(msg)showToast("Not Saved",msg);});}
 async function syncNow(){if(!loaded||busy)return;var curV=new Map();vaultCards.forEach(function(c){curV.set(vKey(c),c);});var adds=[],dels=[];curV.forEach(function(c,k){if(!srvV.has(k))adds.push(c);});srvV.forEach(function(k){if(!curV.has(k))dels.push(k);});var curM=new Map();missingCards.forEach(function(m){curM.set(m.name.toLowerCase(),m);});var madds=[],mdels=[];curM.forEach(function(m,k){if(!srvM.has(k))madds.push(m);});srvM.forEach(function(k){if(!curM.has(k))mdels.push(k);});
