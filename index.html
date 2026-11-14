@@ -2484,11 +2484,18 @@
       return v != null ? Number(v) : null;
     }
     // Saves Scryfall's foil / etched prices (TCGplayer market) next to the normal price.
+    // Writes a price under the full card name and, for double-faced cards ("A // B"), under the front face too,
+    // since that is the name the collection usually holds.
+    function setCachedPrice(cardName, suffix, value) {
+      const norm = normalizeCardName(cardName);
+      priceCache[norm + suffix] = value;
+      if (norm.includes(' // ')) priceCache[norm.split(' // ')[0].trim() + suffix] = value;
+    }
     function storeFoilPrices(card, cardName) {
-      const norm = normalizeCardName(cardName || card.name);
+      const name = cardName || card.name;
       const foil = card.prices?.usd_foil, etched = card.prices?.usd_etched;
-      if (foil) priceCache[norm + '|foil'] = parseFloat(foil);
-      if (etched) priceCache[norm + '|etched'] = parseFloat(etched);
+      if (foil) setCachedPrice(name, '|foil', parseFloat(foil));
+      if (etched) setCachedPrice(name, '|etched', parseFloat(etched));
     }
     function getCardPrice(cardName, explicitPrice, printing) {
       if (explicitPrice != null && !isNaN(explicitPrice)) return Number(explicitPrice);
@@ -3301,7 +3308,53 @@
     // =======================================================================
     // 5. FETCH ALL PRICES WITH SPINNING LOADING MODAL
     // =======================================================================
-    async function batchFetchScryfallPricesByNames(cardNames, onProgress) {
+    // Second pass: cards Scryfall had no price for (common with old sets like Fallen Empires, where the default
+    // printing has no listing) borrow the cheapest price listed on any other printing, near mint or not.
+    let lastPriceFallbackCount = 0;
+    async function fetchPrintingPricesFor(name) {
+      const q = encodeURIComponent('!"' + name + '" include:extras');
+      let cards = [];
+      try {
+        const res = await fetch(`https://api.scryfall.com/cards/search?q=${q}&unique=prints`);
+        if (res.ok) {
+          cards = (await res.json()).data || [];
+        } else if (res.status === 404) {
+          const r2 = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+          if (r2.ok) cards = [await r2.json()];
+        }
+      } catch (e) { console.warn('Printing price lookup failed for', name, e); }
+      return cards;
+    }
+    async function fillMissingPricesFromOtherPrintings(onProgress) {
+      const need = new Map(); // normalized name -> clean name
+      const add = (n, printing) => {
+        if (cachedPriceFor(n, printing) == null) need.set(normalizeCardName(n), String(n).replace(/\s*\([^)]*\)\s*$/g, '').trim());
+      };
+      missingCards.forEach(m => add(m.name));
+      vaultCards.forEach(v => add(v.name, v.printing));
+      const names = Array.from(need.values()).filter(Boolean);
+      lastPriceFallbackCount = 0;
+      const minOf = (cards, field) => {
+        const vals = cards.map(c => parseFloat(c.prices?.[field])).filter(n => Number.isFinite(n) && n > 0);
+        return vals.length ? Math.min(...vals) : null;
+      };
+      for (let i = 0; i < names.length; i++) {
+        if (typeof onProgress === 'function') onProgress(i + 1, names.length);
+        const cards = await fetchPrintingPricesFor(names[i]);
+        if (cards.length) {
+          const usd = minOf(cards, 'usd'), foil = minOf(cards, 'usd_foil'), etched = minOf(cards, 'usd_etched');
+          const any = usd ?? foil ?? etched;
+          let found = false;
+          if (priceCache[normalizeCardName(names[i])] == null && any != null) { setCachedPrice(names[i], '', any); found = true; }
+          if (foil != null && priceCache[normalizeCardName(names[i]) + '|foil'] == null) { setCachedPrice(names[i], '|foil', foil); found = true; }
+          if (etched != null && priceCache[normalizeCardName(names[i]) + '|etched'] == null) { setCachedPrice(names[i], '|etched', etched); found = true; }
+          if (found) lastPriceFallbackCount++;
+        }
+        await new Promise(r => setTimeout(r, 110));
+      }
+    }
+
+    async function batchFetchScryfallPricesByNames(cardNames, onProgress, onFallbackProgress) {
       const uniqueNames = Array.from(new Set(cardNames.map(n => String(n).replace(/\s*\([^)]*\)\s*$/g, '').trim()).filter(Boolean)));
       if (uniqueNames.length === 0) return 0;
 
@@ -3328,7 +3381,7 @@
               const p = card.prices?.usd || card.prices?.usd_foil;
               storeFoilPrices(card, card.name);
               if (p) {
-                priceCache[normalizeCardName(card.name)] = parseFloat(p);
+                setCachedPrice(card.name, '', parseFloat(p));
                 updatedCount++;
               }
             });
@@ -3339,12 +3392,16 @@
         await new Promise(r => setTimeout(r, 110));
       }
 
+      await fillMissingPricesFromOtherPrintings(onFallbackProgress);
+      updatedCount += lastPriceFallbackCount;
+
       missingCards.forEach(m => {
         const p = priceCache[normalizeCardName(m.name)];
         if (p != null) m.price = p;
       });
       vaultCards.forEach(v => {
-        const p = cachedPriceFor(v.name, v.printing);
+        // a foil copy with no foil price anywhere falls back to the regular price rather than none
+        const p = cachedPriceFor(v.name, v.printing) ?? (isFoilPrinting(v.printing) ? (priceCache[normalizeCardName(v.name)] ?? null) : null);
         if (p != null) v.price = p;
       });
 
@@ -3373,10 +3430,15 @@
         if (counter) counter.textContent = `${done} / ${total} unique cards`;
         if (batchStatus) batchStatus.textContent = `Fetching Scryfall batch ${chunkIdx} of ${totalChunks}...`;
         if (bar) bar.style.width = `${Math.round((done / Math.max(1, total)) * 100)}%`;
+      }, (done, total) => {
+        if (counter) counter.textContent = `${done} / ${total} cards without a price`;
+        if (batchStatus) batchStatus.textContent = 'Checking other printings for cards with no listed price...';
+        if (bar) bar.style.width = `${Math.round((done / Math.max(1, total)) * 100)}%`;
       });
 
       if (modal) modal.classList.add('hidden');
-      showToast('All Prices Synced', `Updated TCGplayer Near Mint prices for ${count.toLocaleString()} cards.`);
+      const extra = lastPriceFallbackCount > 0 ? ` (${lastPriceFallbackCount.toLocaleString()} priced from another printing)` : '';
+      showToast('All Prices Synced', `Updated TCGplayer prices for ${count.toLocaleString()} cards${extra}.`);
     }
 
     // =======================================================================
