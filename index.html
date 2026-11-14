@@ -694,7 +694,7 @@
             <option value="BATCHES">Scanned Batches Only</option>
             <option value="MISSING">Missing Cards Only</option>
           </select>
-          <select id="globalCodexSortSelect" onchange="renderGlobalSearchPage()" class="sm:col-span-3 px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
+          <select id="globalCodexSortSelect" onchange="globalSearchSortState = null; renderGlobalSearchPage()" class="sm:col-span-3 px-3 py-2 rounded-xl bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
             <option value="match">Sort: Found Matches First</option>
             <option value="name_asc">Sort: Card Name (A → Z)</option>
             <option value="set_asc">Sort: Set Code (A → Z)</option>
@@ -723,12 +723,12 @@
           <table class="w-full text-left border-collapse">
             <thead class="sticky top-0 z-10 bg-obsidian-900 border-b border-white/15 text-[11px] font-semibold uppercase tracking-wider text-parchment-300">
               <tr>
-                <th class="py-2.5 px-4 w-36">Source</th>
-                <th class="py-2.5 px-4 w-44">Location / Status</th>
-                <th class="py-2.5 px-4">Card Name</th>
-                <th class="py-2.5 px-3 w-36">Set</th>
-                <th class="py-2.5 px-3 w-40">Details</th>
-                <th class="py-2.5 px-4 text-right w-28">NM Price</th>
+                <th onclick="toggleGlobalSearchSort('source')" class="py-2.5 px-4 w-36 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">Source<span class="gs-sort-ind" data-col="source"></span></th>
+                <th onclick="toggleGlobalSearchSort('location')" class="py-2.5 px-4 w-44 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">Location / Status<span class="gs-sort-ind" data-col="location"></span></th>
+                <th onclick="toggleGlobalSearchSort('name')" class="py-2.5 px-4 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">Card Name<span class="gs-sort-ind" data-col="name"></span></th>
+                <th onclick="toggleGlobalSearchSort('set')" class="py-2.5 px-3 w-36 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">Set<span class="gs-sort-ind" data-col="set"></span></th>
+                <th onclick="toggleGlobalSearchSort('meta')" class="py-2.5 px-3 w-40 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">Details<span class="gs-sort-ind" data-col="meta"></span></th>
+                <th onclick="toggleGlobalSearchSort('price')" class="py-2.5 px-4 text-right w-28 cursor-pointer hover:text-gold-300 select-none" title="Click to sort all results">NM Price<span class="gs-sort-ind" data-col="price"></span></th>
                 <th class="py-2.5 px-4 text-right w-40">Links</th>
               </tr>
             </thead>
@@ -3103,6 +3103,26 @@
       return true;
     }
 
+    // Click a Search column heading to sort every result (not just the visible ones):
+    // 1st click = default direction, 2nd = reverse, 3rd = back to the "Sort:" dropdown.
+    let globalSearchSortState = null; // { column, dir }
+    function toggleGlobalSearchSort(column) {
+      const first = column === 'price' ? 'desc' : 'asc';
+      const second = first === 'asc' ? 'desc' : 'asc';
+      const cur = globalSearchSortState;
+      if (!cur || cur.column !== column) globalSearchSortState = { column, dir: first };
+      else if (cur.dir === first) globalSearchSortState = { column, dir: second };
+      else globalSearchSortState = null;
+      renderGlobalSearchPage();
+    }
+    function updateGlobalSearchSortIndicators() {
+      document.querySelectorAll('.gs-sort-ind').forEach(el => {
+        const s = globalSearchSortState;
+        if (!s || s.column !== el.dataset.col) { el.innerHTML = '<span class="opacity-30 ml-1">↕</span>'; return; }
+        el.innerHTML = `<span class="text-gold-400 ml-1">${s.dir === 'asc' ? '▲' : '▼'}</span>`;
+      });
+    }
+
     function renderGlobalSearchPage() {
       const tbody = document.getElementById('globalSearchTableBody');
       if (!tbody) return;
@@ -3158,7 +3178,25 @@
         return `${item.name} ${item.set} ${item.location} ${item.meta} ${item.source}`.toLowerCase().includes(query);
       });
 
-      filtered.sort((a, b) => {
+      const headerSort = globalSearchSortState;
+      updateGlobalSearchSortIndicators();
+      if (headerSort) {
+        const mult = headerSort.dir === 'asc' ? 1 : -1;
+        const cmpText = (x, y) => String(x ?? '').localeCompare(String(y ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+        filtered.sort((a, b) => {
+          if (headerSort.column === 'price') {
+            // cards with no price always go last, whichever direction is chosen
+            if (a.price == null && b.price == null) return cmpText(a.name, b.name);
+            if (a.price == null) return 1;
+            if (b.price == null) return -1;
+            return (a.price - b.price) * mult || cmpText(a.name, b.name);
+          }
+          const key = headerSort.column;
+          const av = key === 'source' ? (a.source === 'BATCH' ? 'Scanned Batch' : 'Missing List') : a[key];
+          const bv = key === 'source' ? (b.source === 'BATCH' ? 'Scanned Batch' : 'Missing List') : b[key];
+          return cmpText(av, bv) * mult || cmpText(a.name, b.name);
+        });
+      } else filtered.sort((a, b) => {
         if (sortMode === 'match') {
           if (a.isMatch !== b.isMatch) return a.isMatch ? -1 : 1;
           return a.name.localeCompare(b.name);
