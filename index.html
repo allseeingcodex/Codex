@@ -1299,19 +1299,21 @@
   <!-- ===================================================================== -->
   <!-- SPINNING LOADING MODAL FOR FETCHING ALL PRICES                        -->
   <!-- ===================================================================== -->
-  <div id="priceLoadingModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="arcane-card arcane-border-glow rounded-2xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
-      <div class="w-14 h-14 rounded-2xl bg-gold-500/15 border border-gold-400/40 text-gold-400 flex items-center justify-center mx-auto text-2xl">
-        <i class="fa-solid fa-circle-notch fa-spin"></i>
+  <div id="priceLoadingModal" class="hidden fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-xs pointer-events-none" role="status" aria-live="polite">
+    <div class="arcane-card arcane-border-glow rounded-xl p-3.5 shadow-2xl pointer-events-auto space-y-2.5">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 shrink-0 rounded-lg bg-gold-500/15 border border-gold-400/40 text-gold-400 flex items-center justify-center">
+          <i class="fa-solid fa-circle-notch fa-spin"></i>
+        </div>
+        <div class="min-w-0">
+          <h3 class="font-display text-sm font-bold text-parchment-100 leading-tight">Fetching TCGplayer NM Prices...</h3>
+          <p id="priceLoadingBatchStatus" class="text-[11px] text-parchment-300 truncate">Querying Scryfall (75 cards/request)...</p>
+        </div>
       </div>
-      <div class="space-y-1">
-        <h3 class="font-display text-lg font-bold text-parchment-100">Fetching All TCGplayer NM Prices...</h3>
-        <p id="priceLoadingBatchStatus" class="text-xs text-parchment-300">Querying Scryfall Bulk Collection API (75 cards/request)...</p>
-      </div>
-      <div class="w-full h-2.5 bg-obsidian-950 rounded-full overflow-hidden border border-white/10">
+      <div class="w-full h-2 bg-obsidian-950 rounded-full overflow-hidden border border-white/10">
         <div id="priceLoadingBar" class="h-full bg-gradient-to-r from-gold-500 to-emerald-400 transition-all duration-200" style="width: 8%"></div>
       </div>
-      <div id="priceLoadingCounter" class="text-xs font-mono font-bold text-gold-300">0 / 0 unique cards</div>
+      <div id="priceLoadingCounter" class="text-[11px] font-mono font-bold text-gold-300">0 / 0 unique cards</div>
     </div>
   </div>
 
