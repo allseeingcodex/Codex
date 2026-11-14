@@ -4448,5 +4448,29 @@ var tries=0,fast=setInterval(function(){tries++;if(staff()&&tok()){pull();clearI
 window.refreshChangeLog=pull;
 })();
 </script>
+<script>
+(function(){
+var KEY="codex_last_tab",saved=null,restoring=true,ADMIN={admin:1,users:1,changelog:1};
+try{saved=localStorage.getItem(KEY);}catch(e){}
+function staff(){try{return !!isAdminOrOwner();}catch(e){return false;}}
+var orig=window.switchTab;
+if(typeof orig!=="function")return;
+window.switchTab=function(id){
+var r=orig.apply(this,arguments);
+if(!window.__codexRestoring){restoring=false;try{if(id)localStorage.setItem(KEY,id);}catch(e){}}
+return r;};
+if(!saved||saved==="home")return;
+var tries=0,iv=setInterval(function(){
+tries++;
+if(!restoring||tries>60){clearInterval(iv);return;}
+if(ADMIN[saved]&&!staff())return;
+if(tries<3)return;
+clearInterval(iv);
+window.__codexRestoring=true;
+try{window.switchTab(saved);}catch(e){}
+window.__codexRestoring=false;
+},500);
+})();
+</script>
 </body>
 </html>
