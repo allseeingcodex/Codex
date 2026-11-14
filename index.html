@@ -252,6 +252,12 @@
     }
 
     /* Foil card icon (shown next to foil cards, like Moxfield) */
+    #codex-tip { position: fixed; z-index: 99999; max-width: 260px; padding: 6px 10px; border-radius: 8px; font-size: 12px; line-height: 1.35;
+      background: #0f172a; color: #f8fafc; border: 1px solid rgba(251,191,36,0.6); box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      pointer-events: none; opacity: 0; transition: opacity .08s; }
+    #codex-tip.show { opacity: 1; }
+    .price-star { cursor: help; padding: 0 3px; }
+    .foil-icon { cursor: help; }
     .foil-icon {
       display: inline-block; width: 0.78em; height: 1.05em; margin-left: 0.4rem; vertical-align: -0.15em;
       border-radius: 0.14em; border: 1px solid rgba(255,255,255,0.75);
@@ -2479,7 +2485,7 @@
     function foilIconHtml(printing) {
       if (!isFoilPrinting(printing)) return '';
       const label = /etched/i.test(String(printing)) ? 'Etched foil' : 'Foil';
-      return `<span class="foil-icon" role="img" aria-label="${label}" title="${label}"></span>`;
+      return `<span class="foil-icon" role="img" aria-label="${label}" data-tip="${label}"></span>`;
     }
     // Old name-level cache (one price per card name), only used until a card gets an exact-printing price.
     function setCachedPrice(cardName, suffix, value) {
@@ -2503,8 +2509,30 @@
     }
     function priceStarHtml(card) {
       if (!(card && (card.priceSrc === 'approx' || card.priceApprox))) return '';
-      return '<span class="text-amber-300 font-bold" title="Estimate: this exact printing has no price listed on Scryfall, so this is the cheapest price listed for another printing of the card.">*</span>';
+      return '<span class="price-star text-amber-300 font-bold" tabindex="0" data-tip="* Estimated price: Scryfall has no price listed for this exact printing, so this is the cheapest price listed for another printing of the same card.">*</span>';
     }
+
+    // Instant hover/tap tooltips for anything with data-tip (foil icon, price asterisk)
+    (function () {
+      let tip = null, current = null;
+      function el() { if (!tip) { tip = document.createElement('div'); tip.id = 'codex-tip'; document.body.appendChild(tip); } return tip; }
+      function show(target) {
+        const t = el(); current = target;
+        t.textContent = target.getAttribute('data-tip');
+        t.classList.add('show');
+        const r = target.getBoundingClientRect(), w = t.offsetWidth, h = t.offsetHeight;
+        let x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+        let y = r.top - h - 8; if (y < 8) y = r.bottom + 8;
+        t.style.left = x + 'px'; t.style.top = y + 'px';
+      }
+      function hide() { current = null; if (tip) tip.classList.remove('show'); }
+      document.addEventListener('mouseover', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) show(t); });
+      document.addEventListener('mouseout', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) hide(); });
+      document.addEventListener('focusin', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) show(t); });
+      document.addEventListener('focusout', hide);
+      document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) { current === t ? hide() : show(t); e.stopPropagation(); } else hide(); }, true);
+      window.addEventListener('scroll', hide, true);
+    })();
     function vaultRecordKey(c) { return String(c.batch) + '|' + String(c.seq) + '|' + String(c.name).toLowerCase(); }
     // When cards are reloaded from the account server / Sheet (which don't store prices), keep the prices we already had.
     function carryPriceFields(newCards, oldCards, keyFn) {
