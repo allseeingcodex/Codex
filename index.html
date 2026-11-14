@@ -766,6 +766,11 @@
     <!-- VIEW 2: MISSING CARDS                                               -->
     <!-- =================================================================== -->
     <section id="view-missing" class="hidden space-y-4">
+      <div class="flex justify-end">
+        <button onclick="switchTab('inscribe')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-400 hover:bg-amber-300 text-obsidian-950 shadow transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-plus"></i><span>Mass Import Missing Cards</span>
+        </button>
+      </div>
       <!-- Located in Batches Banner -->
       <div id="panel-missing-found" data-movable-section="missing-found" class="arcane-card rounded-xl p-4 border-l-4 border-l-emerald-400 space-y-2.5 collapsible-panel-anim">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -892,6 +897,11 @@
     <!-- VIEW 3: BATCHES (ALL 9,274 CARDS ACROSS 18 BATCHES)                 -->
     <!-- =================================================================== -->
     <section id="view-vaults" class="hidden space-y-4">
+      <div class="flex justify-end">
+        <button onclick="switchTab('sync')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 shadow transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-file-csv"></i><span>Import CSV Files</span>
+        </button>
+      </div>
       <!-- Toggle Visible Batches (1-18) Bar -->
       <div id="panel-batch-visibility" data-movable-section="batch-visibility" class="arcane-card rounded-xl p-3.5 space-y-2.5 collapsible-panel-anim">
         <div class="flex flex-wrap items-center justify-between gap-2">
