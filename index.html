@@ -4450,25 +4450,27 @@ window.refreshChangeLog=pull;
 </script>
 <script>
 (function(){
-var KEY="codex_last_tab",saved=null,restoring=true,ADMIN={admin:1,users:1,changelog:1};
+var KEY="codex_last_tab",saved=null,user=false,ADMIN={admin:1,users:1,changelog:1};
 try{saved=localStorage.getItem(KEY);}catch(e){}
 function staff(){try{return !!isAdminOrOwner();}catch(e){return false;}}
+function mark(){user=true;}
+["mousedown","keydown","touchstart"].forEach(function(n){document.addEventListener(n,mark,true);});
 var orig=window.switchTab;
 if(typeof orig!=="function")return;
 window.switchTab=function(id){
 var r=orig.apply(this,arguments);
-if(!window.__codexRestoring){restoring=false;try{if(id)localStorage.setItem(KEY,id);}catch(e){}}
+if(user&&id){try{localStorage.setItem(KEY,id);}catch(e){}}
 return r;};
 if(!saved||saved==="home")return;
 var tries=0,iv=setInterval(function(){
 tries++;
-if(!restoring||tries>60){clearInterval(iv);return;}
-if(ADMIN[saved]&&!staff())return;
+if(user||tries>40){clearInterval(iv);return;}
 if(tries<3)return;
-clearInterval(iv);
-window.__codexRestoring=true;
-try{window.switchTab(saved);}catch(e){}
-window.__codexRestoring=false;
+if(ADMIN[saved]&&!staff())return;
+var v=document.getElementById("view-"+saved);
+if(v&&v.offsetParent)return;
+try{orig(saved);}catch(e){}
+try{window.switchTab&&0;}catch(e){}
 },500);
 })();
 </script>
