@@ -107,21 +107,13 @@
       border-left: 4px solid #10b981 !important;
     }
 
-    /* Staple cards (search highlight) */
-    .staple-row {
-      background: rgba(168, 85, 247, 0.16) !important;
-      border-left: 4px solid #a855f7 !important;
-    }
-    .staple-name { color: #d8b4fe !important; }
-    .staple-badge {
-      display: inline-block; margin-left: 0.5rem; padding: 0 0.4rem; border-radius: 0.35rem;
-      font-size: 0.65rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    /* Staple / Standard tags shown in the card preview */
+    .staple-tag {
+      display: inline-block; padding: 0.1rem 0.5rem; border-radius: 0.4rem;
+      font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
       background: #a855f7; color: #1e0a33; vertical-align: middle;
     }
-    html.light tbody tr.staple-row { background: #e9d5ff !important; border-left: 5px solid #7e22ce !important; }
-    html.light .staple-name { color: #581c87 !important; font-weight: 800; }
-    html.light .staple-badge { background: #7e22ce; color: #ffffff; }
-
+    html.light .staple-tag { background: #7e22ce; color: #ffffff; }
     .standard-tag {
       display: inline-block; padding: 0.1rem 0.5rem; border-radius: 0.4rem;
       font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
@@ -718,7 +710,7 @@
               <input id="globalCodexStandardOnly" type="checkbox" onchange="renderGlobalSearchPage()" class="accent-sky-500" />
               <span>Standard legal only</span>
             </label>
-            <span id="globalStapleCountLabel" class="text-xs text-parchment-300"></span>
+            <span id="globalStapleCountLabel" class="flag-status text-xs text-parchment-300"></span>
           </div>
         </div>
       </div>
@@ -843,6 +835,17 @@
             <option value="LOCATED">Found in Batches Only</option>
             <option value="STILL_MISSING">Still Missing Only</option>
           </select>
+          <div class="sm:col-span-12 flex flex-wrap items-center gap-2">
+            <label for="missingStapleOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-purple-500/15 border border-purple-400/40 text-xs font-semibold text-purple-300 cursor-pointer select-none">
+              <input id="missingStapleOnly" type="checkbox" onchange="renderMissingTable()" class="accent-purple-500" />
+              <span>★ Staples only</span>
+            </label>
+            <label for="missingStandardOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/15 border border-sky-400/40 text-xs font-semibold text-sky-300 cursor-pointer select-none">
+              <input id="missingStandardOnly" type="checkbox" onchange="renderMissingTable()" class="accent-sky-500" />
+              <span>Standard legal only</span>
+            </label>
+            <span class="flag-status text-xs text-parchment-300"></span>
+          </div>
         </div>
       </div>
 
@@ -950,6 +953,17 @@
             <option value="ALL">All Cards</option>
             <option value="MISSING_ONLY">Missing List Matches Only</option>
           </select>
+          <div class="sm:col-span-12 flex flex-wrap items-center gap-2">
+            <label for="vaultStapleOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-purple-500/15 border border-purple-400/40 text-xs font-semibold text-purple-300 cursor-pointer select-none">
+              <input id="vaultStapleOnly" type="checkbox" onchange="vaultCurrentPage=1; renderVaultTable()" class="accent-purple-500" />
+              <span>★ Staples only</span>
+            </label>
+            <label for="vaultStandardOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/15 border border-sky-400/40 text-xs font-semibold text-sky-300 cursor-pointer select-none">
+              <input id="vaultStandardOnly" type="checkbox" onchange="vaultCurrentPage=1; renderVaultTable()" class="accent-sky-500" />
+              <span>Standard legal only</span>
+            </label>
+            <span class="flag-status text-xs text-parchment-300"></span>
+          </div>
         </div>
       </div>
 
@@ -1199,6 +1213,15 @@
               <option value="missing">From Missing Cards</option>
               <option value="vault">From Batches</option>
             </select>
+            <label for="trashStapleOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-purple-500/15 border border-purple-400/40 text-xs font-semibold text-purple-300 cursor-pointer select-none">
+              <input id="trashStapleOnly" type="checkbox" onchange="renderRecentlyDeletedTable()" class="accent-purple-500" />
+              <span>★ Staples only</span>
+            </label>
+            <label for="trashStandardOnly" class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/15 border border-sky-400/40 text-xs font-semibold text-sky-300 cursor-pointer select-none">
+              <input id="trashStandardOnly" type="checkbox" onchange="renderRecentlyDeletedTable()" class="accent-sky-500" />
+              <span>Standard legal only</span>
+            </label>
+            <span class="flag-status text-xs text-parchment-300"></span>
           </div>
           <span class="font-mono text-[11px] text-parchment-400">Auto-purges items older than 7 days</span>
         </div>
@@ -2602,6 +2625,7 @@
       const cFilter = document.getElementById('missingColorFilter')?.value || 'ALL';
       const sFilter = document.getElementById('missingSetFilter')?.value || 'ALL';
       const stFilter = document.getElementById('missingStatusFilter')?.value || 'ALL';
+      if (!cardFlagFilterReady('missing', renderMissingTable)) return;
 
       let rows = missingCards.map(m => {
         const hits = vaultByNormName.get(normalizeCardName(m.name)) || [];
@@ -2616,6 +2640,7 @@
         if (sFilter !== 'ALL' && m.set !== sFilter) return false;
         if (stFilter === 'LOCATED' && !m.isLocated) return false;
         if (stFilter === 'STILL_MISSING' && m.isLocated) return false;
+        if (!passesCardFlagFilters('missing', m.name)) return false;
         if (q) {
           const hitStr = m.hits.map(h => `${h.batch} #${h.seq}`).join(' ');
           const hay = `${m.name} ${m.set} ${m.color} ${hitStr}`.toLowerCase();
@@ -2651,12 +2676,12 @@
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
-          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${isStapleCard(m.name) ? 'staple-row' : (m.isLocated ? 'located-row-glow' : '')}">
+          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${m.isLocated ? 'located-row-glow' : ''}">
             ${cols.status ? `<td class="py-2 px-4 whitespace-nowrap">${statusHtml}</td>` : ''}
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(m.name)}', '', '${escapeJs(m.set)}')" class="font-semibold ${isStapleCard(m.name) ? 'staple-name' : 'text-parchment-100 hover:text-gold-300'} text-left transition">
+              <button onclick="openInspectModal('${escapeJs(m.name)}', '', '${escapeJs(m.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(m.name)}
-              </button>${isStapleCard(m.name) ? '<span class="staple-badge">★ Staple</span>' : ''}
+              </button>
             </td>
             ${cols.color ? `<td class="py-2 px-3"><span class="mana-badge mana-${escapeHtml(m.color || 'C')}"><span class="mana-dot"></span>${escapeHtml(m.color || 'C')}</span></td>` : ''}
             ${cols.set ? `<td class="py-2 px-3 font-mono text-xs text-parchment-200">${escapeHtml(m.set || '—')}</td>` : ''}
@@ -2713,6 +2738,7 @@
       const rFilter = document.getElementById('vaultRarityFilter')?.value || 'ALL';
       const sFilter = document.getElementById('vaultSetFilter')?.value || 'ALL';
       const mFilter = document.getElementById('vaultMatchFilter')?.value || 'ALL';
+      if (!cardFlagFilterReady('vault', renderVaultTable)) return;
 
       let rows = vaultCards.map((c, idx) => {
         const isMatch = missingMap.has(normalizeCardName(c.name));
@@ -2730,6 +2756,7 @@
         if (rFilter !== 'ALL' && c.rarity !== rFilter) return false;
         if (sFilter !== 'ALL' && c.set !== sFilter) return false;
         if (mFilter === 'MISSING_ONLY' && !c.isMatch) return false;
+        if (!passesCardFlagFilters('vault', c.name)) return false;
         if (q) {
           const hay = `${c.name} ${c.set} ${c.batch} ${c.number} ${c.tcgId}`.toLowerCase();
           if (!hay.includes(q)) return false;
@@ -2775,13 +2802,13 @@
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
-          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${isStapleCard(c.name) ? 'staple-row' : (c.isMatch ? 'located-row-glow' : '')}">
+          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${c.isMatch ? 'located-row-glow' : ''}">
             ${cols.batch ? `<td class="py-2 px-3 font-mono font-bold text-xs text-gold-300">${escapeHtml(c.batch)}</td>` : ''}
             ${cols.seq ? `<td class="py-2 px-3 font-mono text-xs text-parchment-300">#${escapeHtml(c.seq)}</td>` : ''}
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(c.name)}', '${escapeJs(c.tcgId)}', '${escapeJs(c.set)}')" class="font-semibold ${isStapleCard(c.name) ? 'staple-name' : 'text-parchment-100 hover:text-gold-300'} text-left transition">
+              <button onclick="openInspectModal('${escapeJs(c.name)}', '${escapeJs(c.tcgId)}', '${escapeJs(c.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(c.name)}
-              </button>${isStapleCard(c.name) ? '<span class="staple-badge">★ Staple</span>' : ''}
+              </button>
             </td>
             ${cols.match ? `<td class="py-2 px-3">${c.isMatch ? `<span class="px-2 py-0.5 rounded bg-emerald-500 text-obsidian-950 font-mono font-bold text-xs">MISSING MATCH</span>` : `<span class="text-xs text-parchment-400">—</span>`}</td>` : ''}
             ${cols.set ? `<td class="py-2 px-3 text-xs text-parchment-200">${escapeHtml(c.set)}</td>` : ''}
@@ -2853,8 +2880,8 @@
           const data = await res.json();
           (data.data || []).forEach(c => names.push(c.name));
           page++;
-          const lbl = document.getElementById('globalStapleCountLabel');
-          if (lbl) lbl.textContent = `Loading Standard card list from Scryfall… page ${page}${data.total_cards ? ' of ' + Math.ceil(data.total_cards / 175) : ''}`;
+          const msg = `Loading Standard card list from Scryfall… page ${page}${data.total_cards ? ' of ' + Math.ceil(data.total_cards / 175) : ''}`;
+          document.querySelectorAll('.flag-status').forEach(el => { el.textContent = msg; });
           url = data.has_more ? data.next_page : null;
           if (url) await new Promise(r => setTimeout(r, 110)); // be polite to Scryfall's rate limit
         }
@@ -2862,7 +2889,10 @@
         try { localStorage.setItem(STANDARD_CACHE_KEY, JSON.stringify({ ts: Date.now(), names })); } catch (e) {}
         standardLegalSet = buildStandardSet(names);
         return standardLegalSet;
-      })().finally(() => { standardLegalLoading = null; });
+      })().finally(() => {
+        standardLegalLoading = null;
+        document.querySelectorAll('.flag-status').forEach(el => { el.textContent = ''; });
+      });
       return standardLegalLoading;
     }
     function isStandardLegalName(name) {
@@ -3000,6 +3030,27 @@
       return key.includes(' // ') && STAPLE_KEY_SET.has(key.split(' // ')[0].trim());
     }
 
+    // Shared "Staples only" / "Standard legal only" filters for every card list page.
+    // Each page has checkboxes with ids <prefix>StapleOnly and <prefix>StandardOnly.
+    function cardFlagFilterReady(prefix, rerender) {
+      const std = document.getElementById(prefix + 'StandardOnly');
+      if (!std || !std.checked) return true;
+      if (standardLegalSet || loadStandardFromCache()) return true;
+      ensureStandardLegalSet().then(() => rerender()).catch(err => {
+        console.warn('Standard list error:', err);
+        std.checked = false;
+        showToast('Standard list unavailable', 'Could not load the Standard-legal card list from Scryfall. Try again in a moment.');
+        rerender();
+      });
+      document.querySelectorAll('.flag-status').forEach(el => { if (!el.textContent.startsWith('Loading')) el.textContent = 'Loading Standard card list from Scryfall…'; });
+      return false;
+    }
+    function passesCardFlagFilters(prefix, name) {
+      if (document.getElementById(prefix + 'StapleOnly')?.checked && !isStapleCard(name)) return false;
+      if (document.getElementById(prefix + 'StandardOnly')?.checked && !isStandardLegalName(name)) return false;
+      return true;
+    }
+
     function renderGlobalSearchPage() {
       const tbody = document.getElementById('globalSearchTableBody');
       if (!tbody) return;
@@ -3007,21 +3058,7 @@
       const query = (document.getElementById('globalCodexSearchInput')?.value || '').trim().toLowerCase();
       const sourceFilter = document.getElementById('globalCodexSourceFilter')?.value || 'ALL';
       const sortMode = document.getElementById('globalCodexSortSelect')?.value || 'match';
-      const stapleOnly = !!document.getElementById('globalCodexStapleOnly')?.checked;
-      const standardOnlyBox = document.getElementById('globalCodexStandardOnly');
-      const standardOnly = !!standardOnlyBox?.checked;
-      if (standardOnly && !standardLegalSet && !loadStandardFromCache()) {
-        // Need the Standard list first; fetch it, then re-render.
-        ensureStandardLegalSet().then(() => renderGlobalSearchPage()).catch(err => {
-          console.warn('Standard list error:', err);
-          if (standardOnlyBox) standardOnlyBox.checked = false;
-          showToast('Standard list unavailable', 'Could not load the Standard-legal card list from Scryfall. Try again in a moment.');
-          renderGlobalSearchPage();
-        });
-        const lbl = document.getElementById('globalStapleCountLabel');
-        if (lbl && !lbl.textContent.startsWith('Loading')) lbl.textContent = 'Loading Standard card list from Scryfall…';
-        return;
-      }
+      if (!cardFlagFilterReady('globalCodex', renderGlobalSearchPage)) return;
 
       const { missingMap, vaultByNormName } = buildCrossReferenceIndex();
       const combined = [];
@@ -3064,8 +3101,7 @@
       }
 
       const filtered = combined.filter(item => {
-        if (stapleOnly && !item.isStaple) return false;
-        if (standardOnly && !isStandardLegalName(item.name)) return false;
+        if (!passesCardFlagFilters('globalCodex', item.name)) return false;
         if (!query) return true;
         return `${item.name} ${item.set} ${item.location} ${item.meta} ${item.source}`.toLowerCase().includes(query);
       });
@@ -3107,13 +3143,13 @@
           : `<span class="text-xs text-parchment-400">—</span>`;
 
         return `
-          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${item.isStaple ? 'staple-row' : (item.isMatch ? 'located-row-glow' : '')}">
+          <tr class="even:bg-white/[0.015] hover:bg-white/[0.05] transition ${item.isMatch ? 'located-row-glow' : ''}">
             <td class="py-2 px-4">${sourceBadge}</td>
             <td class="py-2 px-4">${locBadge}</td>
             <td class="py-2 px-4">
-              <button onclick="openInspectModal('${escapeJs(item.name)}', '${escapeJs(item.tcgId)}', '${escapeJs(item.set)}')" class="font-semibold ${item.isStaple ? 'staple-name' : 'text-parchment-100 hover:text-gold-300'} text-left transition">
+              <button onclick="openInspectModal('${escapeJs(item.name)}', '${escapeJs(item.tcgId)}', '${escapeJs(item.set)}')" class="font-semibold text-parchment-100 hover:text-gold-300 text-left transition">
                 ${escapeHtml(item.name)}
-              </button>${item.isStaple ? '<span class="staple-badge">★ Staple</span>' : ''}
+              </button>
             </td>
             <td class="py-2 px-3 font-mono text-xs text-parchment-200">${escapeHtml(item.set)}</td>
             <td class="py-2 px-3 text-xs text-parchment-300">${escapeHtml(item.meta)}</td>
@@ -4703,9 +4739,11 @@
 
       const q = (document.getElementById('trashSearchInput')?.value || '').trim().toLowerCase();
       const sFilter = document.getElementById('trashSourceFilter')?.value || 'ALL';
+      if (!cardFlagFilterReady('trash', renderRecentlyDeletedTable)) return;
 
       const filtered = visible.filter(item => {
         if (sFilter !== 'ALL' && item.sourceType !== sFilter) return false;
+        if (!passesCardFlagFilters('trash', (item.card || {}).name)) return false;
         if (q) {
           const c = item.card || {};
           const hay = `${c.name} ${c.set} ${c.batch} ${item.deletedBy} ${item.deletedByName}`.toLowerCase();
@@ -4798,7 +4836,12 @@
             <div class="sm:col-span-7 space-y-3 text-xs">
               <div class="text-base font-bold text-parchment-100">${escapeHtml(card.name)} <span class="text-gold-300 whitespace-nowrap">${manaSymbolsHtml(card.mana_cost || (card.card_faces || []).map(f => f.mana_cost).filter(Boolean).join(' // '), 1.25)}</span></div>
               <div class="text-parchment-300 font-semibold">${escapeHtml(card.type_line || '')}</div>
-              ${(card.legalities && card.legalities.standard === 'legal') || (card.legalities && card.legalities.standard === 'restricted') ? '<div><span class="standard-tag" title="Legal in the Standard format (per Scryfall)">Standard Legal</span></div>' : ''}
+              ${(() => {
+                const tags = [];
+                if (isStapleCard(card.name) || isStapleCard(clean)) tags.push('<span class="staple-tag" title="On your Staples list">★ Staple</span>');
+                if (card.legalities && (card.legalities.standard === 'legal' || card.legalities.standard === 'restricted')) tags.push('<span class="standard-tag" title="Legal in the Standard format (per Scryfall)">Standard Legal</span>');
+                return tags.length ? `<div class="flex flex-wrap gap-1.5">${tags.join('')}</div>` : '';
+              })()}
               <p class="text-parchment-200 whitespace-pre-line bg-obsidian-900/80 p-3 rounded-xl border border-white/10">${manaSymbolsHtml(card.oracle_text || card.card_faces?.[0]?.oracle_text || '—', 1.1)}</p>
               <div class="flex items-center justify-between pt-2">
                 <span class="font-mono text-emerald-400 font-bold text-sm">TCGplayer NM: ${usd ? `$${Number(usd).toFixed(2)}` : 'N/A'}</span>
