@@ -5444,7 +5444,7 @@
   </script>
 <script>
 (function(){
-var AUTH_URL="https://script.google.com/macros/s/AKfycbztyn9MO86NFbKFGSe1ev5TdOq87Bw6MdJXHo-VA2vOAKS3m3ugPbyrV4i2zDEubhg/exec";
+var AUTH_URL="https://script.google.com/macros/s/AKfycbzmmU0aa1PdOND6aPw83p4d-2hgFKoD8jZLfB_CNeZeaqrDuxtskE48A3htXbjc4-w/exec";
 var TK="codex_session_v1";
 function gt(){var t="";try{t=localStorage.getItem(TK)||"";}catch(e){}if(!t){try{t=sessionStorage.getItem(TK)||"";}catch(e){}}if(!t){try{var m=/(?:^|;)\s*codex_s=([^;]+)/.exec(document.cookie);if(m)t=decodeURIComponent(m[1]);}catch(e){}}if(!t){try{if(window.name&&window.name.indexOf("codex_s:")===0)t=window.name.slice(8);}catch(e){}}return t;}
 window.__codexGetTok=gt;
@@ -5484,7 +5484,7 @@ if(document.readyState==="loading")window.addEventListener("DOMContentLoaded",fu
 </script>
 <script>
 (function(){
-var URL_="https://script.google.com/macros/s/AKfycbztyn9MO86NFbKFGSe1ev5TdOq87Bw6MdJXHo-VA2vOAKS3m3ugPbyrV4i2zDEubhg/exec";
+var URL_="https://script.google.com/macros/s/AKfycbzmmU0aa1PdOND6aPw83p4d-2hgFKoD8jZLfB_CNeZeaqrDuxtskE48A3htXbjc4-w/exec";
 function gt(){return window.__codexGetTok?window.__codexGetTok():"";}
 function post(a,d){return fetch(URL_,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action:a},d||{}))}).then(function(r){return r.json();}).catch(function(){return {ok:false,error:"Could not reach the card service."};});}
 var srvV=null,srvM=null,loaded=false,timer=null,busy=false,lastSig="",origSave=window.saveAppState;
@@ -5545,7 +5545,7 @@ var fn=M[t.id];if(!fn)return;e.preventDefault();press(t,fn);},true);
 </script>
 <script>
 (function(){
-var URL_="https://script.google.com/macros/s/AKfycbztyn9MO86NFbKFGSe1ev5TdOq87Bw6MdJXHo-VA2vOAKS3m3ugPbyrV4i2zDEubhg/exec";
+var URL_="https://script.google.com/macros/s/AKfycbzmmU0aa1PdOND6aPw83p4d-2hgFKoD8jZLfB_CNeZeaqrDuxtskE48A3htXbjc4-w/exec";
 function tok(){try{return window.__codexGetTok()||"";}catch(e){return "";}}
 function staff(){try{return !!isAdminOrOwner();}catch(e){return false;}}
 function post(d){return fetch(URL_,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(d)}).then(function(r){return r.json();});}
