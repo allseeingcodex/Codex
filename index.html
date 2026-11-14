@@ -5,10 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Codex — Arcane MTG Roca Archive</title>
   <script>
-    /* Remember the last open page: hide Home right away so it never flashes on reload. */
+    /* Apply the saved defaults before first paint: color theme, visual mode, and which page opens first. */
     try {
-      var __t = localStorage.getItem('codex_active_tab_v1');
-      if (__t && __t !== 'home') {
+      var __profs = JSON.parse(localStorage.getItem('codex_user_profiles_v3') || 'null');
+      var __pid = localStorage.getItem('codex_active_profile_id_v3') || 'default-arcane';
+      var __p = Array.isArray(__profs) ? (__profs.find(function (x) { return x.id === __pid; }) || __profs[0]) : null;
+      var __theme = __p && __p.colorTheme ? __p.colorTheme : 'dark';
+      if (__theme === 'auto') __theme = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.classList.toggle('light', __theme === 'light');
+      document.documentElement.classList.toggle('dark', __theme !== 'light');
+      window.__bootProf = { visualMode: __p && __p.visualMode ? __p.visualMode : 'arcane' };
+      var __start = (__p && __p.startPage) || 'last';
+      var __open = __start === 'last' ? localStorage.getItem('codex_active_tab_v1') : __start;
+      if (__open && __open !== 'home') {
         var __s = document.createElement('style');
         __s.id = 'bootTabStyle';
         __s.textContent = '#view-home{display:none !important}';
@@ -222,6 +231,7 @@
   </style>
 </head>
 <body class="selection:bg-gold-500 selection:text-obsidian-950">
+  <script>if (window.__bootProf && window.__bootProf.visualMode === 'simple') document.body.classList.add('simple-mode');</script>
 
   <!-- Global Announcement Banner (Set by Admin) -->
   <div id="globalAnnouncementBar" class="hidden bg-amber-500/20 border-b border-amber-400/40 px-4 py-1.5 text-center text-xs font-medium text-amber-200">
@@ -1317,7 +1327,7 @@
   <div id="profileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this) closeProfileModal()">
     <div class="arcane-card rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
-        <h3 class="font-display text-lg font-bold text-parchment-100">User Profiles &amp; Default Settings</h3>
+        <h3 class="font-display text-lg font-bold text-parchment-100">Profiles &amp; Defaults</h3>
         <button onclick="closeProfileModal()" class="w-8 h-8 rounded-lg bg-obsidian-800 text-parchment-300 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="space-y-3">
@@ -1325,22 +1335,38 @@
           <select id="profileSelectDropdown" onchange="switchProfile(this.value)" class="flex-1 px-3 py-2 rounded-lg bg-obsidian-900 border border-white/15 text-xs text-parchment-100"></select>
           <button onclick="createNewProfile()" class="px-3 py-2 rounded-lg text-xs font-semibold bg-gold-500 text-obsidian-950">+ New Profile</button>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Visual Mode</label>
+            <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Default Visual Mode</label>
             <select id="profileVisualModeSelect" onchange="updateActiveProfileSetting('visualMode', this.value)" class="w-full px-3 py-1.5 rounded-lg bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
               <option value="arcane">Arcane Library Mode</option>
               <option value="simple">Simple Mode (Spreadsheet)</option>
             </select>
           </div>
           <div>
-            <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Color Theme</label>
+            <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Default Color Theme</label>
             <select id="profileColorThemeSelect" onchange="updateActiveProfileSetting('colorTheme', this.value)" class="w-full px-3 py-1.5 rounded-lg bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
               <option value="dark">Dark Mode</option>
               <option value="light">Light Mode (High Contrast)</option>
+              <option value="auto">Match my device</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-[11px] font-mono uppercase text-parchment-400 mb-1">Open To</label>
+            <select id="profileStartPageSelect" onchange="updateActiveProfileSetting('startPage', this.value)" class="w-full px-3 py-1.5 rounded-lg bg-obsidian-900 border border-white/15 text-xs text-parchment-100">
+              <option value="last">The last page I was on</option>
+              <option value="home">Home</option>
+              <option value="search">Search The Codex</option>
+              <option value="missing">Missing Cards</option>
+              <option value="vaults">Batches</option>
+              <option value="inscribe">Add Missing Cards</option>
+              <option value="sync">Import &amp; Sync</option>
+              <option value="trash">Recently Deleted</option>
+              <option value="guide">How It Works</option>
             </select>
           </div>
         </div>
+        <p class="text-[11px] text-parchment-400">These apply every time you open the site on this device. The Simple Mode and Light Mode buttons in the menu change these same settings.</p>
       </div>
     </div>
   </div>
@@ -1977,11 +2003,15 @@
       refreshAllViews();
       let startTab = 'home';
       try {
-        const saved = localStorage.getItem('codex_active_tab_v1');
+        const startPref = getActiveProfile().startPage || 'last';
         const restorable = ['home', 'search', 'missing', 'vaults', 'inscribe', 'sync', 'trash', 'guide'];
         const staffOnly = ['admin', 'users', 'changelog'];
-        const cachedStaff = isAdminOrOwner();
-        if (saved && (restorable.includes(saved) || (cachedStaff && staffOnly.includes(saved)))) startTab = saved;
+        if (startPref === 'last') {
+          const saved = localStorage.getItem('codex_active_tab_v1');
+          if (saved && (restorable.includes(saved) || (isAdminOrOwner() && staffOnly.includes(saved)))) startTab = saved;
+        } else if (restorable.includes(startPref)) {
+          startTab = startPref;
+        }
       } catch (e) {}
       switchTab(startTab);
       const bootStyle = document.getElementById('bootTabStyle');
@@ -3768,20 +3798,37 @@
       refreshAllViews();
     }
 
+    function resolveColorTheme(prof) {
+      if (prof.colorTheme === 'auto') {
+        return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      }
+      return prof.colorTheme === 'light' ? 'light' : 'dark';
+    }
+
+    if (window.matchMedia) {
+      const mq = window.matchMedia('(prefers-color-scheme: light)');
+      const onSchemeChange = () => {
+        try { if (getActiveProfile().colorTheme === 'auto') applyActiveProfileToUI(); } catch (e) {}
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onSchemeChange);
+      else if (mq.addListener) mq.addListener(onSchemeChange);
+    }
+
     function applyActiveProfileToUI() {
       const prof = getActiveProfile();
+      const theme = resolveColorTheme(prof);
       document.body.classList.toggle('simple-mode', prof.visualMode === 'simple');
-      document.documentElement.classList.toggle('light', prof.colorTheme === 'light');
-      document.documentElement.classList.toggle('dark', prof.colorTheme !== 'light');
+      document.documentElement.classList.toggle('light', theme === 'light');
+      document.documentElement.classList.toggle('dark', theme !== 'light');
 
       const hpName = document.getElementById('headerProfileName');
       if (hpName) hpName.textContent = prof.name;
       const smLabel = document.getElementById('simpleModeBtnLabel');
       if (smLabel) smLabel.textContent = prof.visualMode === 'simple' ? 'Arcane Mode' : 'Simple Mode';
       const thIcon = document.getElementById('themeToggleIcon');
-      if (thIcon) thIcon.className = prof.colorTheme === 'light' ? 'fa-solid fa-moon text-xs' : 'fa-solid fa-sun text-xs';
+      if (thIcon) thIcon.className = theme === 'light' ? 'fa-solid fa-moon text-xs' : 'fa-solid fa-sun text-xs';
       const thText = document.getElementById('themeToggleTextLabel');
-      if (thText) thText.textContent = prof.colorTheme === 'light' ? 'Dark Mode' : 'Light Mode';
+      if (thText) thText.textContent = theme === 'light' ? 'Dark Mode' : 'Light Mode';
     }
 
     function toggleSimpleMode() {
@@ -3793,7 +3840,7 @@
 
     function toggleColorTheme() {
       const prof = getActiveProfile();
-      prof.colorTheme = prof.colorTheme === 'light' ? 'dark' : 'light';
+      prof.colorTheme = resolveColorTheme(prof) === 'light' ? 'dark' : 'light';
       saveAppState();
       applyActiveProfileToUI();
     }
@@ -3803,7 +3850,8 @@
       sel.innerHTML = userProfiles.map(p => `<option value="${escapeHtml(p.id)}" ${p.id === activeProfileId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
       const prof = getActiveProfile();
       document.getElementById('profileVisualModeSelect').value = prof.visualMode;
-      document.getElementById('profileColorThemeSelect').value = prof.colorTheme;
+      document.getElementById('profileColorThemeSelect').value = prof.colorTheme || 'dark';
+      document.getElementById('profileStartPageSelect').value = prof.startPage || 'last';
       document.getElementById('profileModal').classList.remove('hidden');
     }
 
