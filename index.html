@@ -273,14 +273,9 @@
             <div id="drawerAccountEmailLabel" class="text-[11px] font-mono text-parchment-400 truncate">nategccs@gmail.com</div>
           </div>
         </div>
-        <div class="flex items-center gap-1.5 pt-1">
-          <button onclick="openAuthModal(); closeNavDrawer();" class="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-obsidian-900 hover:bg-obsidian-700 text-gold-300 border border-white/10 transition">
-            <i class="fa-solid fa-id-badge mr-1"></i>Account / Avatar
-          </button>
-          <button onclick="openProfileModal(); closeNavDrawer();" class="py-1.5 px-2.5 rounded-lg text-[11px] font-semibold bg-obsidian-900 hover:bg-obsidian-700 text-parchment-200 border border-white/10 transition" title="Profile & View Settings">
-            <i class="fa-solid fa-sliders"></i>
-          </button>
-        </div>
+        <button onclick="openProfileModal(); closeNavDrawer();" class="w-full py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-obsidian-900 hover:bg-obsidian-700 text-parchment-200 border border-white/10 transition" title="Profile & View Settings">
+          <i class="fa-solid fa-sliders mr-1"></i>Profile &amp; View Settings
+        </button>
       </div>
 
       <!-- Collapsible Stats Dropdown Inside Menu -->
@@ -315,30 +310,30 @@
       <!-- Navigation Links Container -->
       <nav id="dynamicNavLinksContainer" class="px-3 space-y-1"></nav>
 
-      <!-- Admin Controls in Menu (Edit Site, User List, Admin Console, Change Log, Menu Builder) -->
-      <div class="px-3 mt-3 space-y-1.5 admin-only-control">
-        <div class="text-[10px] font-mono uppercase tracking-wider text-gold-400/80 px-1 pt-1">Admin Tools</div>
-        <div class="grid grid-cols-2 gap-1.5">
-          <button onclick="toggleAdminEditMode(); closeNavDrawer();" id="btnAdminEditSite" class="py-2 px-2.5 rounded-lg text-xs font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-gold-300 border border-gold-400/40 flex items-center justify-center gap-1.5 transition cursor-pointer">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span id="adminEditSiteLabel">Edit Site</span>
-          </button>
-          <button onclick="switchTab('users'); closeNavDrawer();" class="py-2 px-2.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-gold-300 border border-gold-400/40 flex items-center justify-center gap-1.5 transition cursor-pointer">
-            <i class="fa-solid fa-users-gear"></i>
-            <span>User List</span>
-          </button>
+      <!-- Admin section (admins and owner only): admin pages first, then admin commands -->
+      <div id="drawerAdminSection" class="px-3 mt-4 pt-3 border-t border-gold-400/25 space-y-1 admin-only-control">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-gold-400/80 px-1 pb-1 flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-halved"></i>Admin
         </div>
-        <button onclick="switchTab('changelog'); closeNavDrawer();" class="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-400/35 flex items-center justify-between transition cursor-pointer">
-          <span class="flex items-center gap-2">
-            <i class="fa-solid fa-scroll"></i>
-            <span>Change Log &amp; Undo</span>
-          </span>
-          <span id="drawerChangeLogBadge" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-500/25 text-sky-200">0</span>
+        <nav id="adminNavLinksContainer" class="space-y-1"></nav>
+        <div class="text-[10px] font-mono uppercase tracking-wider text-parchment-400 px-1 pt-2">Admin Commands</div>
+        <button onclick="toggleAdminEditMode(); closeNavDrawer();" id="btnAdminEditSite" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 text-parchment-200 hover:bg-obsidian-800 transition cursor-pointer">
+          <i class="fa-solid fa-wand-magic-sparkles w-4 text-center"></i>
+          <span id="adminEditSiteLabel">Edit Site</span>
         </button>
-        <button onclick="openMenuBuilderModal(); closeNavDrawer();" class="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-gold-500/15 hover:bg-gold-500/25 text-gold-300 border border-gold-400/30 flex items-center justify-center gap-2 transition cursor-pointer">
-          <i class="fa-solid fa-pen-ruler"></i>
+        <button onclick="openMenuBuilderModal(); closeNavDrawer();" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 text-parchment-200 hover:bg-obsidian-800 transition cursor-pointer">
+          <i class="fa-solid fa-pen-ruler w-4 text-center"></i>
           <span>Edit Menu &amp; Custom Pages</span>
         </button>
+        <button onclick="exportMasterJson()" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 text-parchment-200 hover:bg-obsidian-800 transition cursor-pointer">
+          <i class="fa-solid fa-download w-4 text-center"></i>
+          <span>Backup JSON</span>
+        </button>
+        <label class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 text-parchment-200 hover:bg-obsidian-800 transition cursor-pointer">
+          <i class="fa-solid fa-upload w-4 text-center"></i>
+          <span>Restore from JSON</span>
+          <input type="file" accept=".json" class="hidden" onchange="importMasterJson(event)" />
+        </label>
       </div>
     </div>
 
@@ -357,19 +352,6 @@
           <i id="themeToggleIcon" class="fa-solid fa-sun text-xs"></i>
           <span id="themeToggleTextLabel">Light Mode</span>
         </button>
-      </div>
-      <button onclick="fetchAllPricesEverywhere(); closeNavDrawer();" class="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-gold-500 hover:bg-gold-400 text-obsidian-950 flex items-center justify-center gap-2 transition shadow">
-        <i class="fa-solid fa-coins"></i>
-        <span>Fetch All Prices</span>
-      </button>
-      <div class="flex items-center gap-1.5">
-        <button onclick="exportMasterJson()" class="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium bg-obsidian-800 hover:bg-obsidian-700 text-parchment-200 border border-white/10 transition">
-          <i class="fa-solid fa-download mr-1"></i>Backup JSON
-        </button>
-        <label class="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium bg-obsidian-800 hover:bg-obsidian-700 text-parchment-200 border border-white/10 transition text-center cursor-pointer">
-          <i class="fa-solid fa-upload mr-1"></i>Restore
-          <input type="file" accept=".json" class="hidden" onchange="importMasterJson(event)" />
-        </label>
       </div>
       <!-- Subtle Last Synced Notice at bottom of Hamburger Menu -->
       <div class="pt-1.5 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-parchment-400">
@@ -1887,6 +1869,15 @@
         // Accounts without a stored password cannot sign in until a password is set.
         const storedEmail = localStorage.getItem(STORAGE_KEY_ACTIVE_EMAIL);
         currentAccountEmail = '';
+        // If a saved login exists, show the remembered account right away; the server re-checks it right after load.
+        try {
+          const tok = window.__codexGetTok ? window.__codexGetTok() : '';
+          const cached = JSON.parse(localStorage.getItem('codex_account_cache_v1') || sessionStorage.getItem('codex_account_cache_v1') || 'null');
+          if (tok && cached && cached.email) {
+            appAccounts = [cached];
+            currentAccountEmail = cached.email;
+          }
+        } catch (e3) {}
 
         const savedSheetName = localStorage.getItem(STORAGE_KEY_BASE_SHEET_NAME);
         if (savedSheetName && savedSheetName.trim()) {
@@ -1989,11 +1980,7 @@
         const saved = localStorage.getItem('codex_active_tab_v1');
         const restorable = ['home', 'search', 'missing', 'vaults', 'inscribe', 'sync', 'trash', 'guide'];
         const staffOnly = ['admin', 'users', 'changelog'];
-        let cachedStaff = false;
-        try {
-          const c = JSON.parse(localStorage.getItem('codex_account_cache_v1') || sessionStorage.getItem('codex_account_cache_v1') || 'null');
-          cachedStaff = !!(c && (c.role === 'owner' || c.role === 'admin'));
-        } catch (e2) {}
+        const cachedStaff = isAdminOrOwner();
         if (saved && (restorable.includes(saved) || (cachedStaff && staffOnly.includes(saved)))) startTab = saved;
       } catch (e) {}
       switchTab(startTab);
@@ -3698,28 +3685,47 @@
     // =======================================================================
     // 9. NAVIGATION, PROFILES, AUTH MODAL & INSPECTOR
     // =======================================================================
+    // Pages that already have a button in the top header (no need to repeat them in the menu)
+    const NAV_IDS_IN_HEADER = ['inscribe', 'sync'];
+    // Pages that live in the Admin section of the menu
+    const NAV_IDS_ADMIN = ['admin', 'users', 'changelog'];
+
     function renderDynamicNavMenu() {
       const nav = document.getElementById('dynamicNavLinksContainer');
       if (!nav) return;
       const visibleTrashCount = getVisibleRecentlyDeletedItems().length;
-      nav.innerHTML = siteCustomizations.navMenu
-        .filter(item => item.visible !== false && (((item.id !== 'admin') && (item.id !== 'users') && (item.id !== 'changelog')) || isAdminOrOwner()))
-        .map(item => {
-          const active = item.id === currentActiveTabId;
-          const clickAttr = item.type === 'external'
-            ? `window.open('${escapeJs(item.url)}', '_blank')`
-            : `switchTab('${escapeJs(item.id)}')`;
-          const trashBadge = item.id === 'trash' && visibleTrashCount > 0
-            ? `<span class="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${active ? 'bg-obsidian-950 text-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-400/30'}">${visibleTrashCount}</span>`
-            : '';
-          return `
-            <button onclick="${clickAttr}" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${active ? 'bg-gold-500 text-obsidian-950 font-bold shadow' : 'text-parchment-200 hover:bg-obsidian-800'}">
-              <i class="fa-solid ${escapeHtml(item.icon || 'fa-circle')} w-4 text-center"></i>
-              <span>${escapeHtml(item.label)}</span>
-              ${trashBadge}
-            </button>
-          `;
-        }).join('');
+
+      const renderItem = (item) => {
+        const active = item.id === currentActiveTabId;
+        const clickAttr = item.type === 'external'
+          ? `window.open('${escapeJs(item.url)}', '_blank')`
+          : `switchTab('${escapeJs(item.id)}')`;
+        let badge = '';
+        if (item.id === 'trash' && visibleTrashCount > 0) {
+          badge = `<span class="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${active ? 'bg-obsidian-950 text-amber-300' : 'bg-amber-500/20 text-amber-300 border border-amber-400/30'}">${visibleTrashCount}</span>`;
+        } else if (item.id === 'changelog') {
+          badge = `<span id="drawerChangeLogBadge" class="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${active ? 'bg-obsidian-950 text-sky-300' : 'bg-sky-500/25 text-sky-200'}">${changeLogEntries.length}</span>`;
+        }
+        return `
+          <button onclick="${clickAttr}" class="w-full px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-3 transition ${active ? 'bg-gold-500 text-obsidian-950 font-bold shadow' : 'text-parchment-200 hover:bg-obsidian-800'}">
+            <i class="fa-solid ${escapeHtml(item.icon || 'fa-circle')} w-4 text-center"></i>
+            <span>${escapeHtml(item.label)}</span>
+            ${badge}
+          </button>
+        `;
+      };
+
+      const items = siteCustomizations.navMenu.filter(item => item.visible !== false);
+      nav.innerHTML = items
+        .filter(item => !NAV_IDS_ADMIN.includes(item.id) && !NAV_IDS_IN_HEADER.includes(item.id))
+        .map(renderItem).join('');
+
+      const adminNav = document.getElementById('adminNavLinksContainer');
+      if (adminNav) {
+        adminNav.innerHTML = isAdminOrOwner()
+          ? items.filter(item => NAV_IDS_ADMIN.includes(item.id)).map(renderItem).join('')
+          : '';
+      }
     }
 
     function switchTab(tabId) {
