@@ -4492,7 +4492,7 @@ var nv=vaultCards.filter(function(c){return !v0[sig(c)];});
 if(nm.length)rec("ADD",nm.length>1?"Added "+nm.length+" Missing Cards":"Added Missing Card","Added "+names(nm)+" to Missing Cards.",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});
 if(nv.length)rec("ADD",nv.length>1?"Added "+nv.length+" Batch Cards":"Added Batch Card","Added "+names(nv)+" to the Batches.",{type:"ADD_VAULT",cards:nv});
 });};}
-["adminManualAddMissingCard","adminManualAddVaultCard","commitInscribedCardsToGrimoire"].forEach(wrapAdd);
+["adminManualAddMissingCard","adminManualAddVaultCard"].forEach(wrapAdd);
 var pend={missing:[],vault:[]},timer=null;
 var mv=window.moveCardToRecentlyDeleted;
 if(typeof mv==="function")window.moveCardToRecentlyDeleted=function(type,card){
@@ -4521,6 +4521,106 @@ wrapTrash("restoreCardFromRecentlyDeleted","restore");
 wrapTrash("restoreAllRecentlyDeleted","restore");
 wrapTrash("permanentlyDeleteFromTrash","perm");
 wrapTrash("emptyRecentlyDeletedNow","perm");
+})();
+</script>
+<script>
+(function(){
+var SRC={
+inscribe:{n:"Add Missing Cards",c:"#fbbf24"},
+missing:{n:"Missing Cards",c:"#e0b84c"},
+batches:{n:"Batches",c:"#34d399"},
+csv:{n:"Import CSV",c:"#c084fc"},
+trash:{n:"Recently Deleted",c:"#fb7185"},
+users:{n:"User List",c:"#fb923c"},
+settings:{n:"Settings / Sync",c:"#38bdf8"}
+};
+function classify(e){
+var l=String(e.actionLabel||""),u=e.undoData&&e.undoData.type||"",x=l+" "+String(e.summary||"");
+if(/Roca CSV|Imported/i.test(l))return "csv";
+if(/Add Missing Cards/i.test(l))return "inscribe";
+if(u==="ADD_MISSING"||u==="DELETE_MISSING"||/Missing Card/i.test(l))return "missing";
+if(u==="ADD_VAULT"||u==="DELETE_VAULT"||/Batch Card/i.test(l))return "batches";
+if(e.category==="RESTORE"||/Permanently|Recently Deleted/i.test(l))return "trash";
+if(u==="USER_ROLE_CHANGE"||/user|role|ban|account/i.test(l))return "users";
+return "settings";}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function rgba(h,a){var n=parseInt(h.slice(1),16);return "rgba("+(n>>16)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function decorate(){
+try{
+var tb=document.getElementById("changeLogTableBody");if(!tb)return;
+var wrap=tb.closest(".arcane-card");
+if(wrap&&!document.getElementById("changeLogLegend")){
+var lg=document.createElement("div");lg.id="changeLogLegend";lg.style.cssText="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px 0;font:600 11px monospace";
+lg.innerHTML=Object.keys(SRC).map(function(k){return '<span style="padding:2px 8px;border-radius:6px;border:1px solid '+rgba(SRC[k].c,.5)+';background:'+rgba(SRC[k].c,.15)+';color:'+SRC[k].c+'">'+SRC[k].n+'</span>';}).join("");
+wrap.parentNode.insertBefore(lg,wrap);}
+var q=((document.getElementById("changeLogSearchInput")||{}).value||"").trim().toLowerCase();
+var cf=(document.getElementById("changeLogTypeFilter")||{}).value||"ALL";
+var f=changeLogEntries.filter(function(e){
+if(cf!=="ALL"&&e.category!==cf)return false;
+if(q){var h=(e.actorName+" "+e.actorEmail+" "+e.actionLabel+" "+e.summary+" "+e.category).toLowerCase();if(h.indexOf(q)<0)return false;}
+return true;});
+var rows=tb.querySelectorAll("tr");
+if(rows.length!==f.length)return;
+f.forEach(function(e,i){
+var k=SRC[classify(e)],tr=rows[i],tds=tr.children;
+tr.style.boxShadow="inset 4px 0 0 "+k.c;tr.style.background=rgba(k.c,.07);
+if(tds[2]&&!tds[2].querySelector(".cl-src")){
+var d=document.createElement("div");d.className="cl-src";d.style.marginTop="4px";
+d.innerHTML='<span style="padding:1px 6px;border-radius:5px;border:1px solid '+rgba(k.c,.5)+';background:'+rgba(k.c,.18)+';color:'+k.c+';font:600 10px monospace">'+esc(k.n)+'</span>';
+tds[2].appendChild(d);}
+});
+}catch(x){}}
+var ort=window.renderChangeLogTable;
+if(typeof ort==="function")window.renderChangeLogTable=function(){var r=ort.apply(this,arguments);decorate();return r;};
+setTimeout(function(){try{window.renderChangeLogTable();}catch(e){}},500);
+
+function confirmBox(title,body,okLabel,onOk,onCancel){
+var o=document.createElement("div");
+o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px";
+o.innerHTML='<div style="max-width:440px;width:100%;background:#0f0f14;border:1px solid rgba(224,184,76,.5);border-radius:14px;padding:20px;color:#e8e2d0;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.6)"><div style="font-weight:700;font-size:16px;color:#e0b84c;margin-bottom:8px">'+esc(title)+'</div><div style="font-size:13px;line-height:1.5;max-height:40vh;overflow:auto;margin-bottom:16px">'+body+'</div><div style="display:flex;gap:8px;justify-content:flex-end"><button data-x="no" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#e8e2d0;cursor:pointer">Cancel</button><button data-x="ok" style="padding:8px 14px;border-radius:8px;border:0;background:#e0b84c;color:#111;font-weight:700;cursor:pointer">'+esc(okLabel)+'</button></div></div>';
+function close(){if(o.parentNode)o.parentNode.removeChild(o);document.removeEventListener("keydown",kd,true);}
+function kd(ev){if(ev.key==="Escape"){close();if(onCancel)onCancel();}}
+document.addEventListener("keydown",kd,true);
+o.addEventListener("click",function(ev){var x=ev.target&&ev.target.getAttribute&&ev.target.getAttribute("data-x");
+if(x==="ok"){close();onOk();}else if(x==="no"||ev.target===o){close();if(onCancel)onCancel();}});
+document.body.appendChild(o);
+var b=o.querySelector('[data-x="ok"]');if(b)b.focus();}
+function list(a){var l=a.slice(0,10).map(function(n){return "<li>"+esc(n)+"</li>";}).join("");return '<ul style="margin:6px 0 0 18px;list-style:disc">'+l+(a.length>10?"<li>...and "+(a.length-10)+" more</li>":"")+"</ul>";}
+function rec(cat,label,sum,undo){try{recordChangeLog(cat,label,sum,undo);}catch(e){}}
+function sig(c){return normalizeCardName(c.name)+"|"+c.batch+"|"+c.seq;}
+
+var oc=window.commitInscribedCardsToGrimoire;
+if(typeof oc==="function")window.commitInscribedCardsToGrimoire=function(){
+var self=this,args=arguments,L;
+try{L=inscribedPreviewList.slice();}catch(e){L=[];}
+if(!L.length)return oc.apply(self,args);
+confirmBox("Add these cards?","Add <b>"+L.length+"</b> card"+(L.length===1?"":"s")+" to Missing Cards?"+list(L.map(function(c){return c.name;})),"Add to Missing Cards",function(){
+var m0={};try{missingCards.forEach(function(c){m0[c.id]=1;});}catch(e){}
+var r=oc.apply(self,args);
+try{var nm=missingCards.filter(function(c){return !m0[c.id];});
+if(nm.length){var n=nm.map(function(c){return '"'+c.name+'"';});
+rec("ADD",nm.length>1?"Added "+nm.length+" via Add Missing Cards":"Added via Add Missing Cards","Added "+(n.length>3?n.slice(0,3).join(", ")+" and "+(n.length-3)+" more":n.join(", "))+" from the Add Missing Cards tab.",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});}}catch(e){}
+});};
+
+var oh=window.handleRocaCsvUpload,pendCsv=null;
+if(typeof oh==="function")window.handleRocaCsvUpload=function(event){
+var self=this,files=[];
+try{files=Array.from(event.target.files||[]);}catch(e){}
+var valid=files.filter(function(f){return /^Batch-\d+\.csv$/i.test(f.name.trim());});
+if(!valid.length)return oh.call(self,event);
+confirmBox("Import these CSV files?","Import <b>"+valid.length+"</b> file"+(valid.length===1?"":"s")+" into the Batches?"+list(valid.map(function(f){return f.name;})),"Import",function(){
+var v0={};try{vaultCards.forEach(function(c){v0[sig(c)]=1;});}catch(e){}
+pendCsv={v0:v0,names:valid.map(function(f){return f.name;})};
+oh.call(self,event);
+},function(){try{event.target.value="";}catch(e){}});};
+var ot=window.showToast;
+if(typeof ot==="function")window.showToast=function(title){
+var r=ot.apply(this,arguments);
+if(title==="Roca CSV Batches Imported"&&pendCsv){
+var p=pendCsv;pendCsv=null;
+try{var nv=vaultCards.filter(function(c){return !p.v0[sig(c)];});
+if(nv.length)rec("ADD","Imported Roca CSV","Imported "+nv.length.toLocaleString()+" cards from "+p.names.join(", ")+".",nv.length>300?null:{type:"ADD_VAULT",cards:nv});}catch(e){}}
+return r;};
 })();
 </script>
 </body>
