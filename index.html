@@ -3359,8 +3359,13 @@
 
     // ---- set name -> Scryfall set code (Roca/TCGplayer set names differ slightly from Scryfall's) ----
     let scryfallSets = null;
-    function normSetName(sn) {
-      return String(sn || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/&/g, ' and ').replace(/[‘’'`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const ORDINAL_WORDS = { 3: 'third', 4: 'fourth', 5: 'fifth', 6: 'sixth', 7: 'seventh', 8: 'eighth', 9: 'ninth', 10: 'tenth' };
+    const SET_ALIASES = { 'timeshifted': 'tsb', 'commander': 'cmd' }; // TCGplayer names Scryfall words differently
+    function normSetName(sn, keepParens) {
+      let t = String(sn || '').toLowerCase();
+      if (!keepParens) t = t.replace(/\([^)]*\)/g, ' ');
+      t = t.replace(/&/g, ' and ').replace(/[‘’'`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+      return t.replace(/\b(3|4|5|6|7|8|9|10)(?:rd|th)\b/g, (m, d) => ORDINAL_WORDS[d]);
     }
     async function ensureScryfallSets() {
       if (scryfallSets) return scryfallSets;
@@ -3376,8 +3381,8 @@
         try { localStorage.setItem(STORAGE_KEY_SET_CODES, JSON.stringify({ ts: Date.now(), sets: list })); } catch (e) {}
       }
       const entries = list.map(([code, name]) => {
-        const norm = normSetName(name);
-        return { code, norm, tokens: new Set(norm.split(' ').filter(Boolean)) };
+        const norm = normSetName(name, true);
+        return { code, norm, normStripped: normSetName(name, false), tokens: new Set(norm.split(' ').filter(Boolean)) };
       });
       scryfallSets = { codes: new Set(list.map(x => x[0])), entries, memo: new Map() };
       return scryfallSets;
@@ -3391,13 +3396,23 @@
       const paren = raw.match(/\(([A-Za-z0-9]{2,6})\)\s*$/);               // "Magic 2013 (M13)"
       if (paren && S.codes.has(paren[1].toLowerCase())) code = paren[1].toLowerCase();
       if (!code && /^[A-Za-z0-9]{2,6}$/.test(raw) && S.codes.has(raw.toLowerCase())) code = raw.toLowerCase(); // already a code
-      if (!code) {
-        const n = normSetName(raw);
-        const exact = n ? S.entries.find(e => e.norm === n) : null;
-        if (exact) {
-          code = exact.code;
-        } else if (n) {
-          const toks = new Set(n.split(' ').filter(Boolean));
+      const n = normSetName(raw, false);
+      if (!code && SET_ALIASES[n] && S.codes.has(SET_ALIASES[n])) code = SET_ALIASES[n];
+      if (!code && n) {
+        // names to try, best guess first
+        const cands = [];
+        const cm = raw.match(/^commander:\s*(.+)$/i);                      // "Commander: Kaldheim" -> "Kaldheim Commander"
+        if (cm) cands.push(normSetName(cm[1], false) + ' commander');
+        const ub = raw.match(/^universes beyond:\s*(.+)$/i);               // "Universes Beyond: Fallout" -> "Fallout"
+        if (ub) cands.push(normSetName(ub[1], false));
+        cands.push(n);
+        if (raw.includes(':')) cands.push(normSetName(raw.slice(raw.lastIndexOf(':') + 1), false)); // "...: The Big Score"
+        for (const c of cands) {
+          const hit = c ? S.entries.find(e => e.norm === c || e.normStripped === c) : null;
+          if (hit) { code = hit.code; break; }
+        }
+        if (!code) {
+          const toks = new Set(cands[0].split(' ').filter(Boolean));
           let best = null, bestScore = 0;
           S.entries.forEach(e => {
             let inter = 0;
@@ -3406,7 +3421,8 @@
             const jac = union ? inter / union : 0;
             const small = Math.min(toks.size, e.tokens.size);
             const subset = small >= 2 && inter === small;
-            const score = jac + (subset ? 0.25 : 0);
+            let score = jac + (subset ? 0.25 : 0);
+            if (toks.has('commander') !== e.tokens.has('commander')) score -= 0.3; // don't mix Commander decks with main sets
             if ((jac >= 0.6 || (subset && jac >= 0.4)) && score > bestScore) { best = e; bestScore = score; }
           });
           if (best) code = best.code;
