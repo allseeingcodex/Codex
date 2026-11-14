@@ -723,6 +723,7 @@
             <option value="set_asc">Sort: Set Code (A → Z)</option>
             <option value="price_desc">Sort: NM Price (High → Low)</option>
             <option value="staples_first">Sort: Staples First</option>
+            <option value="foils_first">Sort: Foils First</option>
           </select>
           <div class="sm:col-span-12 flex items-center gap-3">
             <label for="globalCodexStapleOnly" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-400/40 text-xs font-semibold text-purple-300 cursor-pointer select-none">
@@ -2815,7 +2816,7 @@
           ${cols.set ? `<th onclick="toggleTableSort('vault','set')" class="py-2.5 px-3 cursor-pointer hover:text-gold-300 select-none">Set ${sortIndicator('vault','set')}</th>` : ''}
           ${cols.number ? `<th onclick="toggleTableSort('vault','number')" class="py-2.5 px-3 cursor-pointer hover:text-gold-300 select-none w-20">Coll # ${sortIndicator('vault','number')}</th>` : ''}
           ${cols.rarity ? `<th onclick="toggleTableSort('vault','rarity')" class="py-2.5 px-3 cursor-pointer hover:text-gold-300 select-none w-24">Rarity ${sortIndicator('vault','rarity')}</th>` : ''}
-          ${cols.condition ? `<th class="py-2.5 px-3 w-28">Cond / Finish</th>` : ''}
+          ${cols.condition ? `<th onclick="toggleTableSort('vault','finish')" class="py-2.5 px-3 cursor-pointer hover:text-gold-300 select-none w-28" title="Click to bring foils to the top">Cond / Finish ${sortIndicator('vault','finish')}</th>` : ''}
           ${cols.qty ? `<th class="py-2.5 px-2 text-center w-14">Qty</th>` : ''}
           ${cols.price ? `<th onclick="toggleTableSort('vault','price')" class="py-2.5 px-4 text-right cursor-pointer hover:text-gold-300 select-none w-24">NM Price ${sortIndicator('vault','price')}</th>` : ''}
           ${cols.links ? `<th class="py-2.5 px-4 text-right w-36">Links</th>` : ''}
@@ -2867,6 +2868,10 @@
         if (column === 'set') return String(a.set).localeCompare(String(b.set)) * mult;
         if (column === 'number') return String(a.number).localeCompare(String(b.number)) * mult;
         if (column === 'rarity') return String(a.rarity).localeCompare(String(b.rarity)) * mult;
+        if (column === 'finish') {
+          const fa = isFoilPrinting(a.printing) ? 1 : 0, fb = isFoilPrinting(b.printing) ? 1 : 0;
+          return (fa - fb) * mult || a.name.localeCompare(b.name);
+        }
         if (column === 'price') return ((a.effectivePrice ?? -1) - (b.effectivePrice ?? -1)) * mult;
         return 0;
       });
@@ -3235,6 +3240,7 @@
             location: `${c.batch} #${c.seq}`,
             isMatch,
             isStaple: isStapleCard(c.name),
+            isFoil: isFoilPrinting(c.printing),
             set: c.set || '—',
             meta: `${c.rarity || 'Common'} • ${c.condition || 'NM'}`,
             printing: c.printing || '',
@@ -3297,6 +3303,10 @@
         if (sortMode === 'name_asc') return a.name.localeCompare(b.name);
         if (sortMode === 'set_asc') return String(a.set).localeCompare(String(b.set));
         if (sortMode === 'price_desc') return (b.price ?? -1) - (a.price ?? -1);
+        if (sortMode === 'foils_first') {
+          if (!!a.isFoil !== !!b.isFoil) return a.isFoil ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        }
         if (sortMode === 'staples_first') {
           if (a.isStaple !== b.isStaple) return a.isStaple ? -1 : 1;
           return a.name.localeCompare(b.name);
