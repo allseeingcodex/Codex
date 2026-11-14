@@ -4507,6 +4507,16 @@
       if (dEl) dEl.textContent = label;
     }
 
+    // Turns Scryfall mana text like "{2}{R}" or "{T}: Add {G}." into HTML with the
+    // official symbol images (text is escaped first, so it is safe to inject).
+    function manaSymbolsHtml(text, sizeEm) {
+      const size = sizeEm || 1.15;
+      return escapeHtml(text).replace(/\{([^{}]+)\}/g, (m, sym) => {
+        const code = sym.replace(/\//g, '').toUpperCase();
+        return `<img src="https://svgs.scryfall.io/card-symbols/${encodeURIComponent(code)}.svg" alt="${escapeHtml(m)}" title="${escapeHtml(m)}" loading="lazy" style="display:inline-block;height:${size}em;width:${size}em;vertical-align:-0.2em;margin:0 0.06em;" />`;
+      });
+    }
+
     async function openInspectModal(cardName, tcgId, setHint) {
       const modal = document.getElementById('inspectModal');
       const title = document.getElementById('inspectModalTitle');
@@ -4533,9 +4543,9 @@
               ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(card.name)}" class="rounded-xl max-h-80 shadow-xl border border-white/10" />` : `<div class="p-8 rounded-xl bg-obsidian-900 text-xs text-parchment-400">No Image</div>`}
             </div>
             <div class="sm:col-span-7 space-y-3 text-xs">
-              <div class="text-base font-bold text-parchment-100">${escapeHtml(card.name)} <span class="font-mono text-gold-300">${escapeHtml(card.mana_cost || '')}</span></div>
+              <div class="text-base font-bold text-parchment-100">${escapeHtml(card.name)} <span class="text-gold-300 whitespace-nowrap">${manaSymbolsHtml(card.mana_cost || (card.card_faces || []).map(f => f.mana_cost).filter(Boolean).join(' // '), 1.25)}</span></div>
               <div class="text-parchment-300 font-semibold">${escapeHtml(card.type_line || '')}</div>
-              <p class="text-parchment-200 whitespace-pre-line bg-obsidian-900/80 p-3 rounded-xl border border-white/10">${escapeHtml(card.oracle_text || card.card_faces?.[0]?.oracle_text || '—')}</p>
+              <p class="text-parchment-200 whitespace-pre-line bg-obsidian-900/80 p-3 rounded-xl border border-white/10">${manaSymbolsHtml(card.oracle_text || card.card_faces?.[0]?.oracle_text || '—', 1.1)}</p>
               <div class="flex items-center justify-between pt-2">
                 <span class="font-mono text-emerald-400 font-bold text-sm">TCGplayer NM: ${usd ? `$${Number(usd).toFixed(2)}` : 'N/A'}</span>
                 <div class="flex gap-2">
