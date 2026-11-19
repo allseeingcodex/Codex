@@ -544,6 +544,11 @@
           <span id="headerLastSyncedText">Synced: Just now</span>
         </span>
 
+        <button onclick="location.reload()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-obsidian-800 hover:bg-obsidian-700 text-gold-300 border border-gold-400/35 transition flex items-center gap-1.5 cursor-pointer" title="Reload the page to get the latest version">
+          <i class="fa-solid fa-rotate"></i>
+          <span>Update</span>
+        </button>
+
         <button onclick="openAuthModal()" class="px-3 py-1.5 rounded-xl bg-obsidian-800 hover:bg-obsidian-700 border border-gold-400/50 flex items-center gap-2 transition cursor-pointer shadow-md" title="Account, Username, and Profile Picture">
           <div id="headerUserAvatar" class="w-6 h-6 rounded-full bg-obsidian-900 border border-gold-400/50 flex items-center justify-center overflow-hidden shrink-0">
             <i class="fa-solid fa-user text-[10px] text-gold-300"></i>
@@ -5662,7 +5667,8 @@ var r=o.apply(this,arguments);
 return after(r,function(){
 var nm=missingCards.filter(function(c){return !m0[c.id];});
 var nv=vaultCards.filter(function(c){return !v0[sig(c)];});
-if(nm.length)rec("ADD",nm.length>1?"Added "+nm.length+" Missing Cards":"Added Missing Card","Added "+names(nm)+" to Missing Cards.",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});
+var vs=window.__codexViaScryfall?" (via Scryfall)":"";
+if(nm.length)rec("ADD",(nm.length>1?"Added "+nm.length+" Missing Cards":"Added Missing Card")+vs,"Added "+names(nm)+" to Missing Cards"+vs+".",{type:"ADD_MISSING",ids:nm.map(function(c){return c.id;})});
 if(nv.length)rec("ADD",nv.length>1?"Added "+nv.length+" Batch Cards":"Added Batch Card","Added "+names(nv)+" to the Batches.",{type:"ADD_VAULT",cards:nv});
 });};}
 ["adminManualAddMissingCard","adminManualAddVaultCard"].forEach(wrapAdd);
@@ -5850,7 +5856,8 @@ return r;};
     var se=document.getElementById("manualMissingSet");if(se)se.value="";
     var ce=document.getElementById("manualMissingColor");if(ce)ce.value="AUTO";
     var pe=document.getElementById("manualMissingPrice");if(pe)pe.value="";
-    await adminManualAddMissingCard();
+    window.__codexViaScryfall=true;
+    try{await adminManualAddMissingCard();}finally{window.__codexViaScryfall=false;}
     if(el.value===""){var l2=loadSkipped(),k=normalizeCardName(x.name);saveSkipped(l2.filter(function(y){return normalizeCardName(y.name)!==k;}));render();}
   };
   function sync(){
@@ -5875,7 +5882,8 @@ return r;};
         var setEl=document.getElementById("manualMissingSet");if(setEl)setEl.value="";
         var colEl=document.getElementById("manualMissingColor");if(colEl)colEl.value="AUTO";
         var prEl=document.getElementById("manualMissingPrice");if(prEl)prEl.value="";
-        await adminManualAddMissingCard();
+        window.__codexViaScryfall=true;
+        try{await adminManualAddMissingCard();}finally{window.__codexViaScryfall=false;}
         if(el.value===""){added++;done.push(names[i]);}
       }
     }catch(e){console.warn("Extension queue import failed:",e);}
