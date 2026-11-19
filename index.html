@@ -5867,6 +5867,7 @@ return r;};
   function ping(){if(busy||!ready())return;sync();window.postMessage({type:"codex-ext-ping"},"*");}
   window.addEventListener("message",async function(ev){
     var d=ev.data;
+    if(ev.source===window&&d&&d.type==="codex-ext-hello"){lastSync="";setTimeout(ping,200);return;}
     if(ev.source!==window||!d||d.type!=="codex-ext-queue"||busy||!ready())return;
     var clean=function(a){return (Array.isArray(a)?a:[]).filter(function(n){return typeof n==="string"&&n.trim()&&n.length<=150;}).slice(0,50);};
     busy=true;
