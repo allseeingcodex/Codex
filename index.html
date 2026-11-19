@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>The Codex — Arcane MTG Roca Archive</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <meta name="theme-color" content="#0b0d17" />
   <script>
     /* Apply the saved defaults before first paint: color theme, visual mode, and which page opens first. */
     try {
@@ -5879,5 +5882,6 @@ return r;};
   setInterval(ping,3000);setTimeout(ping,1200);
 })();
 </script>
+<script>if("serviceWorker"in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
 </body>
 </html>
