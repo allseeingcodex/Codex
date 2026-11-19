@@ -832,8 +832,11 @@
       </div>
 
       <!-- Skipped Scryfall Adds (admin only) -->
-      <div id="panel-skipped-scryfall" class="arcane-card rounded-xl p-3.5 space-y-2.5 admin-only-control collapsible-panel-anim">
-        <span class="text-xs font-mono uppercase text-gold-300 font-semibold"><i class="fa-solid fa-ban mr-1.5"></i>Skipped Scryfall Adds <span id="skippedScryfallCount"></span></span>
+      <div id="panel-skipped-scryfall" data-movable-section="skipped-scryfall" class="arcane-card rounded-xl p-3.5 space-y-2.5 admin-only-control collapsible-panel-anim">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono uppercase text-gold-300 font-semibold"><i class="fa-solid fa-ban mr-1.5"></i>Skipped Scryfall Adds <span id="skippedScryfallCount"></span></span>
+          <button onclick="collapseSectionToRight('panel-skipped-scryfall', 'Skipped Scryfall')" class="px-2 py-0.5 rounded bg-obsidian-800 hover:bg-obsidian-700 text-[11px] font-mono text-parchment-300 cursor-pointer">Minimize »</button>
+        </div>
         <p class="text-[11px] text-parchment-400">Cards added from Scryfall that were skipped because they were already in Missing Cards. Add one anyway, or dismiss it.</p>
         <div id="skippedScryfallList" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
       </div>
@@ -3782,7 +3785,7 @@
     function renderRightCollapsedDock() {
       const dock = document.getElementById('rightCollapsedDock');
       if (!dock) return;
-      const entries = Array.from(minimizedRightPanels.entries()).filter(([, info]) => info.tabId === currentActiveTabId);
+      const entries = Array.from(minimizedRightPanels.entries()).filter(([id, info]) => info.tabId === currentActiveTabId && !document.getElementById(id)?.classList.contains('hidden'));
       dock.innerHTML = entries.map(([panelId, info]) => `
         <button onclick="restoreSectionFromRight('${escapeJs(panelId)}')" class="right-dock-pill pointer-events-auto px-3 py-1.5 rounded-l-xl bg-obsidian-900 hover:bg-obsidian-800 text-gold-300 border border-gold-400/50 shadow-xl text-xs font-mono font-semibold flex items-center gap-2 transition cursor-pointer" title="Expand ${escapeHtml(info.label)}">
           <i class="fa-solid fa-angles-left text-gold-400"></i>
@@ -5918,5 +5921,23 @@ return r;};
 })();
 </script>
 <script>if("serviceWorker"in navigator&&location.protocol==="https:"){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+<script>
+/* Located Cards and Skipped Scryfall Adds start minimized on the Missing Cards page; their dock pills bring them back. */
+(function(){
+  function init(){
+    try{
+      [["panel-missing-found","Located Cards"],["panel-skipped-scryfall","Skipped Scryfall"]].forEach(function(x){
+        var el=document.getElementById(x[0]);if(!el)return;
+        el.classList.add("minimized-to-right");
+        minimizedRightPanels.set(x[0],{label:x[1],tabId:"missing"});
+      });
+      var ap=window.applyAccountPermissionsToUI;
+      if(typeof ap==="function")window.applyAccountPermissionsToUI=function(){var r=ap.apply(this,arguments);try{renderRightCollapsedDock();}catch(e){}return r;};
+      renderRightCollapsedDock();
+    }catch(e){console.warn("Default minimize failed:",e);}
+  }
+  if(document.readyState==="complete")init();else window.addEventListener("load",init);
+})();
+</script>
 </body>
 </html>
