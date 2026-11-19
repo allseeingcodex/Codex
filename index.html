@@ -5811,5 +5811,39 @@ box.value="";
 return r;};
 })();
 </script>
+<script>
+/* Scryfall extension receiver: the browser extension queues card names; once an admin/owner is signed in, add them to Missing Cards. */
+(function(){
+  var busy=false;
+  function ready(){try{return isLoggedIn()&&isAdminOrOwner()&&document.getElementById("manualMissingName");}catch(e){return false;}}
+  function ping(){if(!busy&&ready())window.postMessage({type:"codex-ext-ping"},"*");}
+  window.addEventListener("message",async function(ev){
+    var d=ev.data;
+    if(ev.source!==window||!d||d.type!=="codex-ext-queue"||!Array.isArray(d.cards)||busy||!ready())return;
+    busy=true;
+    var done=[],added=0,dupes=0;
+    try{
+      var names=d.cards.filter(function(n){return typeof n==="string"&&n.trim()&&n.length<=150;}).slice(0,50);
+      for(var i=0;i<names.length;i++){
+        var name=names[i].trim();
+        var key=normalizeCardName(name);
+        var exists=missingCards.some(function(c){return normalizeCardName(c.name)===key;});
+        if(exists){dupes++;done.push(names[i]);continue;}
+        var el=document.getElementById("manualMissingName");
+        el.value=name;
+        var setEl=document.getElementById("manualMissingSet");if(setEl)setEl.value="";
+        var colEl=document.getElementById("manualMissingColor");if(colEl)colEl.value="AUTO";
+        var prEl=document.getElementById("manualMissingPrice");if(prEl)prEl.value="";
+        await adminManualAddMissingCard();
+        if(el.value===""){added++;done.push(names[i]);}
+      }
+    }catch(e){console.warn("Extension queue import failed:",e);}
+    busy=false;
+    if(done.length)window.postMessage({type:"codex-ext-done",names:done},"*");
+    if(added)showToast("Added From Scryfall",added+" card"+(added>1?"s":"")+" added to Missing Cards"+(dupes?" ("+dupes+" already there).":"."));
+  });
+  setInterval(ping,3000);
+})();
+</script>
 </body>
 </html>
