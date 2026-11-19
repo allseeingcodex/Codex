@@ -845,6 +845,9 @@
             <h3 data-editable-id="hdr_missing_filters" class="font-display text-sm font-bold text-parchment-100">Search &amp; Filter Missing Cards</h3>
           </div>
           <div class="flex items-center gap-2 relative">
+            <button id="btnMissingSortAdded" onclick="toggleTableSort('missing','added')" class="px-2.5 py-1 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 border border-white/15 text-xs font-mono text-parchment-200 cursor-pointer" title="Sort by when cards were added to Missing Cards (click again to reverse)">
+              Recently Added
+            </button>
             <button onclick="toggleColMenu('missingColPicker')" class="px-2.5 py-1 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 border border-white/15 text-xs font-mono text-parchment-200 cursor-pointer">
               Columns ▾
             </button>
@@ -2741,7 +2744,23 @@
       else renderVaultTable();
     }
 
+    // Missing Cards have no date stored, so "added" order is the order of the shared list: the server keeps
+    // cards in the order they were added, and cards added in this session (ids made from the time) count as newest.
+    function addedRank(m) {
+      const n = Number(String(m.id || '').replace(/^m-/, ''));
+      if (!isFinite(n)) return 0;
+      return n > 1e11 ? 1e9 + n : n;
+    }
+
     function renderMissingTable() {
+      const sortBtn = document.getElementById('btnMissingSortAdded');
+      if (sortBtn) {
+        const ms = getActiveProfile().missingSort || {};
+        const on = ms.column === 'added';
+        sortBtn.textContent = on ? (ms.dir === 'desc' ? 'Recently Added ▼ (newest first)' : 'Recently Added ▲ (oldest first)') : 'Recently Added';
+        sortBtn.classList.toggle('border-gold-400/60', on);
+        sortBtn.classList.toggle('text-gold-300', on);
+      }
       const thead = document.getElementById('missingTableHead');
       const tbody = document.getElementById('missingTableBody');
       if (!thead || !tbody) return;
@@ -2806,6 +2825,7 @@
           if (a.isLocated !== b.isLocated) return a.isLocated ? -1 * mult : 1 * mult;
           return a.name.localeCompare(b.name);
         }
+        if (column === 'added') return (addedRank(a) - addedRank(b)) * mult;
         if (column === 'name') return a.name.localeCompare(b.name) * mult;
         if (column === 'color') return String(a.color).localeCompare(String(b.color)) * mult;
         if (column === 'set') return String(a.set).localeCompare(String(b.set)) * mult;
