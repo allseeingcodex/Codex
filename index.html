@@ -1339,8 +1339,8 @@
             <i class="fa-solid fa-user"></i>
           </div>
           <div>
-            <h3 class="font-display text-xl font-bold text-parchment-100">My Profile</h3>
-            <p class="text-xs text-parchment-300 mt-0.5">Your username, password and profile picture.</p>
+            <h3 id="authModalTitle" class="font-display text-xl font-bold text-parchment-100">My Profile</h3>
+            <p id="authModalSubtitle" class="text-xs text-parchment-300 mt-0.5">Your username, password and profile picture.</p>
           </div>
         </div>
         <button onclick="closeAuthModal()" class="w-9 h-9 shrink-0 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-parchment-300 flex items-center justify-center" title="Close">
@@ -1383,7 +1383,7 @@
       </div>
 
       <!-- Display defaults -->
-      <div class="pt-6 border-t border-white/10 space-y-4">
+      <div id="authDefaultsSection" class="pt-6 border-t border-white/10 space-y-4">
         <div>
           <h4 class="text-sm font-bold text-parchment-100">Defaults</h4>
           <p class="text-xs text-parchment-400 mt-0.5">Applied every time you open the site on this device. The View and Light/Dark buttons in the menu change these same settings.</p>
@@ -4868,6 +4868,20 @@
       if (open) setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
     }
 
+    // Guests only see sign in / sign up; the profile editor and defaults appear once signed in.
+    function syncAuthModalMode() {
+      const signedIn = !!getCurrentAccount();
+      const show = (id, on) => { const e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
+      show('authCurrentProfileSection', signedIn);
+      show('authDefaultsSection', signedIn);
+      show('btnToggleSwitchAccounts', signedIn);
+      const t = document.getElementById('authModalTitle');
+      if (t) t.textContent = signedIn ? 'My Profile' : 'Sign In / Sign Up';
+      const st = document.getElementById('authModalSubtitle');
+      if (st) st.textContent = signedIn ? 'Your username, password and profile picture.' : 'Sign in to your account, or create a new one.';
+      if (!signedIn) toggleSwitchAccountsPanel(true);
+    }
+
     function openAuthModal() {
       const acc = getCurrentAccount();
       // Guests need the sign in / sign up forms, so show them; signed-in users get the clean profile first.
@@ -4899,6 +4913,7 @@
       if (rBadge) rBadge.innerHTML = acc ? getRoleBadgeHtml(acc) : `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono text-[10px]">SIGNED OUT</span>`;
       const aPrev = document.getElementById('authModalAvatarPreview');
       if (aPrev) aPrev.innerHTML = acc ? getAvatarInnerHtml(acc, 'text-xl') : `<i class="fa-solid fa-user-slash text-xl text-parchment-400"></i>`;
+      syncAuthModalMode();
       document.getElementById('authModal').classList.remove('hidden');
     }
 
