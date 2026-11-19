@@ -21,6 +21,11 @@
       if (__vm === 'simple') __vm = 'spreadsheet'; /* old Simple Mode was the spreadsheet look */
       window.__bootProf = { visualMode: __vm };
       var __start = (__p && __p.startPage) || 'last';
+      /* A brand-new tab always opens Home; only a reload in the same tab returns to the last page. */
+      var __fresh = true;
+      try { __fresh = !sessionStorage.getItem('codex_tab_started_v1'); sessionStorage.setItem('codex_tab_started_v1', '1'); } catch (e) {}
+      window.__freshTab = __fresh;
+      if (__start === 'last' && __fresh) __start = 'home';
       var __open = __start === 'last' ? localStorage.getItem('codex_active_tab_v1') : __start;
       if (__open && __open !== 'home') {
         var __s = document.createElement('style');
@@ -2188,7 +2193,8 @@
       refreshAllViews();
       let startTab = 'home';
       try {
-        const startPref = getActiveProfile().startPage || 'last';
+        let startPref = getActiveProfile().startPage || 'last';
+        if (startPref === 'last' && window.__freshTab) startPref = 'home';
         const restorable = ['home', 'search', 'missing', 'vaults', 'inscribe', 'sync', 'trash', 'guide'];
         const staffOnly = ['admin', 'users', 'changelog'];
         if (startPref === 'last') {
