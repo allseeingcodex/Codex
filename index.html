@@ -818,6 +818,13 @@
         </div>
       </div>
 
+      <!-- Skipped Scryfall Adds (admin only) -->
+      <div id="panel-skipped-scryfall" class="arcane-card rounded-xl p-3.5 space-y-2.5 admin-only-control collapsible-panel-anim">
+        <span class="text-xs font-mono uppercase text-gold-300 font-semibold"><i class="fa-solid fa-ban mr-1.5"></i>Skipped Scryfall Adds <span id="skippedScryfallCount"></span></span>
+        <p class="text-[11px] text-parchment-400">Cards added from Scryfall that were skipped because they were already in Missing Cards. Add one anyway, or dismiss it.</p>
+        <div id="skippedScryfallList" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
+      </div>
+
       <!-- Missing Cards Filter Bar -->
       <div id="panel-missing-filters" data-movable-section="missing-filters" class="arcane-card rounded-xl p-3.5 space-y-2.5 collapsible-panel-anim">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -5812,23 +5819,48 @@ return r;};
 })();
 </script>
 <script>
-/* Scryfall extension receiver: the browser extension queues card names; once an admin/owner is signed in, add them to Missing Cards. */
+/* Scryfall extension receiver: the browser extension queues card names; once an admin/owner is signed in, add them to Missing Cards.
+   Cards already in Missing Cards are skipped and listed in "Skipped Scryfall Adds" so an admin can add them manually. */
 (function(){
-  var busy=false;
+  var busy=false,lastSync="",KEY="codex_scryfall_skipped";
   function ready(){try{return isLoggedIn()&&isAdminOrOwner()&&document.getElementById("manualMissingName");}catch(e){return false;}}
-  function ping(){if(!busy&&ready())window.postMessage({type:"codex-ext-ping"},"*");}
+  function loadSkipped(){try{var l=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(l)?l:[];}catch(e){return [];}}
+  function saveSkipped(l){try{localStorage.setItem(KEY,JSON.stringify(l.slice(0,300)));}catch(e){}}
+  function addSkipped(name){var l=loadSkipped(),k=normalizeCardName(name);if(!l.some(function(x){return normalizeCardName(x.name)===k;})){l.unshift({name:name,at:new Date().toISOString()});saveSkipped(l);}}
+  function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+  function render(){
+    var box=document.getElementById("skippedScryfallList");if(!box)return;
+    var l=loadSkipped();
+    box.innerHTML=l.length?l.map(function(x,i){return '<div class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-obsidian-900 border border-white/10"><span class="text-xs text-parchment-100 truncate">'+esc(x.name)+'<span class="ml-2 text-[10px] font-mono text-parchment-400">'+esc(new Date(x.at).toLocaleDateString())+'</span></span><span class="flex gap-1.5 shrink-0"><button onclick="codexSkippedAdd('+i+')" class="px-2 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-obsidian-950 text-[11px] font-bold cursor-pointer">Add anyway</button><button onclick="codexSkippedDismiss('+i+')" class="px-2 py-1 rounded-lg bg-obsidian-800 hover:bg-obsidian-700 text-parchment-300 border border-white/15 text-[11px] cursor-pointer">Dismiss</button></span></div>';}).join(""):'<p class="text-xs text-parchment-400">No skipped Scryfall adds.</p>';
+    var c=document.getElementById("skippedScryfallCount");if(c)c.textContent=l.length?"("+l.length+")":"";
+  }
+  window.codexSkippedDismiss=function(i){var l=loadSkipped();l.splice(i,1);saveSkipped(l);render();};
+  window.codexSkippedAdd=async function(i){
+    if(!ready())return;var l=loadSkipped(),x=l[i];if(!x)return;
+    var el=document.getElementById("manualMissingName");el.value=x.name;
+    var se=document.getElementById("manualMissingSet");if(se)se.value="";
+    var ce=document.getElementById("manualMissingColor");if(ce)ce.value="AUTO";
+    var pe=document.getElementById("manualMissingPrice");if(pe)pe.value="";
+    await adminManualAddMissingCard();
+    if(el.value===""){var l2=loadSkipped(),k=normalizeCardName(x.name);saveSkipped(l2.filter(function(y){return normalizeCardName(y.name)!==k;}));render();}
+  };
+  function sync(){
+    try{var names=missingCards.map(function(c){return c.name;});var sig=names.length+"|"+names.join("\u0001");
+      if(sig!==lastSync){lastSync=sig;window.postMessage({type:"codex-ext-sync",names:names.slice(0,5000)},"*");}}catch(e){}
+  }
+  function ping(){if(busy||!ready())return;sync();window.postMessage({type:"codex-ext-ping"},"*");}
   window.addEventListener("message",async function(ev){
     var d=ev.data;
-    if(ev.source!==window||!d||d.type!=="codex-ext-queue"||!Array.isArray(d.cards)||busy||!ready())return;
+    if(ev.source!==window||!d||d.type!=="codex-ext-queue"||busy||!ready())return;
+    var clean=function(a){return (Array.isArray(a)?a:[]).filter(function(n){return typeof n==="string"&&n.trim()&&n.length<=150;}).slice(0,50);};
     busy=true;
-    var done=[],added=0,dupes=0;
+    var done=[],skippedDone=[],added=0,skipped=0;
     try{
-      var names=d.cards.filter(function(n){return typeof n==="string"&&n.trim()&&n.length<=150;}).slice(0,50);
+      clean(d.skipped).forEach(function(n){addSkipped(n.trim());skippedDone.push(n);skipped++;});
+      var names=clean(d.cards);
       for(var i=0;i<names.length;i++){
-        var name=names[i].trim();
-        var key=normalizeCardName(name);
-        var exists=missingCards.some(function(c){return normalizeCardName(c.name)===key;});
-        if(exists){dupes++;done.push(names[i]);continue;}
+        var name=names[i].trim(),key=normalizeCardName(name);
+        if(missingCards.some(function(c){return normalizeCardName(c.name)===key;})){addSkipped(name);skipped++;done.push(names[i]);continue;}
         var el=document.getElementById("manualMissingName");
         el.value=name;
         var setEl=document.getElementById("manualMissingSet");if(setEl)setEl.value="";
@@ -5839,9 +5871,11 @@ return r;};
       }
     }catch(e){console.warn("Extension queue import failed:",e);}
     busy=false;
-    if(done.length)window.postMessage({type:"codex-ext-done",names:done},"*");
-    if(added)showToast("Added From Scryfall",added+" card"+(added>1?"s":"")+" added to Missing Cards"+(dupes?" ("+dupes+" already there).":"."));
+    render();sync();
+    if(done.length||skippedDone.length)window.postMessage({type:"codex-ext-done",names:done,skipped:skippedDone},"*");
+    if(added||skipped)showToast("From Scryfall",added+" added"+(skipped?", "+skipped+" skipped (already in Missing Cards - see Skipped Scryfall Adds).":"."));
   });
+  render();
   setInterval(ping,3000);
 })();
 </script>
