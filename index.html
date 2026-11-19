@@ -5876,7 +5876,7 @@ return r;};
     if(added||skipped)showToast("From Scryfall",added+" added"+(skipped?", "+skipped+" skipped (already in Missing Cards - see Skipped Scryfall Adds).":"."));
   });
   render();
-  setInterval(ping,3000);
+  setInterval(ping,3000);setTimeout(ping,1200);
 })();
 </script>
 </body>
